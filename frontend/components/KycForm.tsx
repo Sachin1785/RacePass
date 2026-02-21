@@ -155,33 +155,40 @@ export function KycForm() {
   if (isCheckingKyc) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
-        <p className="text-gray-500 text-sm">Checking KYC status...</p>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500 mb-4"></div>
+        <p className="text-gray-500 text-sm font-medium">Checking KYC status...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-8 max-w-2xl mx-auto">
       {/* Information Panel */}
-      <div className="rounded-lg bg-blue-50 p-4 border border-blue-200">
-        <div className="flex">
+      <div className="rounded-xl bg-amber-50 p-6 border border-amber-100 shadow-sm relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+          <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+          </svg>
+        </div>
+        <div className="flex relative z-10">
           <div className="shrink-0">
-            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                clipRule="evenodd"
-              />
-            </svg>
+            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+              <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
           </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-blue-800">About Didit Identity Verification</h3>
-            <div className="mt-2 text-sm text-blue-700">
+          <div className="ml-4">
+            <h3 className="text-base font-black text-gray-900 leading-none mb-2">Powered by Didit Identity</h3>
+            <div className="text-sm text-gray-600 leading-relaxed font-medium">
               <p>
-                Click the button below to start your identity verification process. 
-                You&apos;ll be guided through document capture and face verification. 
-                The process typically takes 2-5 minutes.
+                Secure your digital racing identity. You&apos;ll be guided through a quick 
+                document capture and face verification process. 
+                Everything is encrypted and privacy-protected.
               </p>
             </div>
           </div>
@@ -190,10 +197,10 @@ export function KycForm() {
 
       {/* Error Display */}
       {error && (
-        <div className="rounded-lg bg-red-50 p-4 border border-red-200">
+        <div className="rounded-xl bg-red-50 p-4 border border-red-100 animate-shake">
           <div className="flex">
             <div className="shrink-0">
-              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -202,22 +209,25 @@ export function KycForm() {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Start Verification Button */}
-      <div className="flex justify-center">
+      <div className="flex justify-center flex-col items-center gap-4">
         <button
           onClick={startVerification}
           disabled={isLoading || !isSdkLoaded}
-          className="w-full max-w-md flex justify-center rounded-md bg-blue-600 px-4 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500 focus:outline-2 focus:outline-offset-2 focus:outline-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="group relative w-full max-w-md flex items-center justify-center rounded-xl bg-amber-500 px-8 py-4 text-lg font-black text-white shadow-xl shadow-amber-200/50 hover:bg-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-1 active:translate-y-0 overflow-hidden"
         >
+          {/* Button Shine effect */}
+          <div className="absolute inset-0 w-1/2 h-full bg-linear-to-r from-transparent via-white/10 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-[250%] transition-transform duration-1000" />
+          
           {isLoading ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -225,84 +235,31 @@ export function KycForm() {
             </>
           ) : (
             <>
-              <svg className="-ml-1 mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              Start Identity Verification
+              <span className="mr-3 text-xl">🛡️</span>
+              Start Verification
             </>
           )}
         </button>
+        <p className="text-xs text-gray-400 font-medium flex items-center gap-2">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+          </svg>
+          256-bit Secure Encryption
+        </p>
       </div>
 
-      {/* Requirements List */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">What You&apos;ll Need</h3>
-        <ul className="space-y-3 text-sm text-gray-600">
-          <li className="flex items-start">
-            <svg
-              className="h-5 w-5 text-green-500 mr-2 shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <span>A valid government-issued ID (passport, driver&apos;s license, or national ID)</span>
-          </li>
-          <li className="flex items-start">
-            <svg
-              className="h-5 w-5 text-green-500 mr-2 shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <span>A device with a camera (for selfie verification)</span>
-          </li>
-          <li className="flex items-start">
-            <svg
-              className="h-5 w-5 text-green-500 mr-2 shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <span>5-10 minutes of your time</span>
-          </li>
-          <li className="flex items-start">
-            <svg
-              className="h-5 w-5 text-green-500 mr-2 shrink-0 mt-0.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
-            <span>Good lighting and a stable internet connection</span>
-          </li>
-        </ul>
+      {/* Steps/Requirements visual clue */}
+      <div className="pt-4 border-t border-gray-100">
+        <div className="grid grid-cols-3 gap-2">
+          {["Identify", "Verify", "Access"].map((step, i) => (
+            <div key={i} className="flex flex-col items-center gap-1 opacity-50 group">
+              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:bg-amber-100 group-hover:text-amber-600 transition-colors">
+                {i + 1}
+              </div>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">{step}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

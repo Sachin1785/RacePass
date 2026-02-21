@@ -1,12 +1,30 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useAccount } from 'wagmi';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
-import { useRacePassProfile } from '@/hooks/useRacePassProfile';
-import { ethers } from 'ethers';
+import { useEffect, useState } from "react";
+import { useAccount } from "wagmi";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Navbar } from "@/components/Navbar";
+import { useRacePassProfile } from "@/hooks/useRacePassProfile";
+import { ethers } from "ethers";
+import { motion, AnimatePresence } from "framer-motion";
+
+// ─── Animation Helpers ────────────────────────────────────────────────────────
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 28 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as any, delay },
+});
+
+const fadeIn = (delay = 0) => ({
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.6, delay },
+});
+
+const stagger = {
+  animate: { transition: { staggerChildren: 0.1 } },
+};
 
 export default function DashboardPage() {
   const { address, isConnected, isConnecting } = useAccount();
@@ -14,15 +32,19 @@ export default function DashboardPage() {
   const [isClient, setIsClient] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
-  
+
   // Transfer modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferRecipient, setTransferRecipient] = useState('');
+  const [transferRecipient, setTransferRecipient] = useState("");
   const [isTransferring, setIsTransferring] = useState(false);
-  const [transferError, setTransferError] = useState('');
-  
+  const [transferError, setTransferError] = useState("");
+
   // Fetch live on-chain profile data
-  const { data: profile, isLoading: profileLoading, error: profileError } = useRacePassProfile();
+  const {
+    data: profile,
+    isLoading: profileLoading,
+    error: profileError,
+  } = useRacePassProfile();
 
   // Wait for client-side hydration
   useEffect(() => {
@@ -31,12 +53,9 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    // Only check after client-side hydration
     if (!isClient) return;
-
-    // Only redirect after wagmi has finished checking connection
     if (!isConnecting && !isConnected) {
-      router.push('/');
+      router.push("/");
       return;
     }
   }, [isClient, isConnecting, isConnected, router]);
@@ -44,76 +63,70 @@ export default function DashboardPage() {
   const handleTransferTicket = async () => {
     if (!selectedTicket || !transferRecipient || !address) return;
 
-    // Validate Ethereum address
     if (!ethers.isAddress(transferRecipient)) {
-      setTransferError('Invalid Ethereum address');
+      setTransferError("Invalid Ethereum address");
       return;
     }
 
     setIsTransferring(true);
-    setTransferError('');
+    setTransferError("");
 
     try {
-      // Connect to user's wallet
       if (!(window as any).ethereum) {
-        throw new Error('MetaMask not installed');
+        throw new Error("MetaMask not installed");
       }
 
       const provider = new ethers.BrowserProvider((window as any).ethereum);
       const signer = await provider.getSigner();
 
-      // RacePassTicket contract address (from backend)
-      const TICKET_ADDRESS = '0xb3BA57B6FEDb83030244e1fe6DB832dfC77B1c57';
-
-      // ERC-721 standard transfer ABI
+      const TICKET_ADDRESS = "0xb3BA57B6FEDb83030244e1fe6DB832dfC77B1c57";
       const ticketABI = [
-        'function safeTransferFrom(address from, address to, uint256 tokenId)',
-        'function ownerOf(uint256 tokenId) view returns (address)'
+        "function safeTransferFrom(address from, address to, uint256 tokenId)",
+        "function ownerOf(uint256 tokenId) view returns (address)",
       ];
 
-      const ticketContract = new ethers.Contract(TICKET_ADDRESS, ticketABI, signer);
-
-      // Verify ownership
+      const ticketContract = new ethers.Contract(
+        TICKET_ADDRESS,
+        ticketABI,
+        signer,
+      );
       const owner = await ticketContract.ownerOf(selectedTicket.onChainId);
       if (owner.toLowerCase() !== address.toLowerCase()) {
-        throw new Error('You do not own this ticket');
+        throw new Error("You do not own this ticket");
       }
 
-      // Execute transfer
       const tx = await ticketContract.safeTransferFrom(
         address,
         transferRecipient,
-        selectedTicket.onChainId
+        selectedTicket.onChainId,
       );
 
       await tx.wait();
-      
-      alert(`Ticket #${selectedTicket.onChainId} successfully transferred to ${transferRecipient}!`);
-      
-      // Reset state
+      alert(
+        `Ticket #${selectedTicket.onChainId} successfully transferred to ${transferRecipient}!`,
+      );
       setShowTransferModal(false);
-      setTransferRecipient('');
+      setTransferRecipient("");
       setSelectedTicket(null);
-      
-      // Refresh profile to update ticket list
       window.location.reload();
     } catch (error: any) {
-      console.error('Transfer error:', error);
-      setTransferError(error.message || 'Failed to transfer ticket');
+      console.error("Transfer error:", error);
+      setTransferError(error.message || "Failed to transfer ticket");
     } finally {
       setIsTransferring(false);
     }
   };
 
-  // Show loading during SSR or while wagmi is checking connection
   if (!isClient || isConnecting) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
+            <p className="mt-4 text-gray-500 font-medium">
+              Loading your ecosystem...
+            </p>
           </div>
         </div>
       </div>
@@ -122,11 +135,11 @@ export default function DashboardPage() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-white">
         <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <p className="text-gray-600">Redirecting...</p>
+            <p className="text-gray-500 font-medium">Redirecting...</p>
           </div>
         </div>
       </div>
@@ -134,187 +147,187 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white font-sans text-gray-900">
       <Navbar />
-      
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Manage your digital identity and credentials
-          </p>
-        </div>
 
-        {/* Wallet Info */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">
-            Connected Wallet
-          </h2>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                <svg
-                  className="h-6 w-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                  />
-                </svg>
+      <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
+        {/* Grid Background */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-40"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 1px 1px, #f59e0b22 1px, transparent 0)",
+            backgroundSize: "32px 32px",
+          }}
+        />
+        {/* Glow Blobs */}
+        <div className="pointer-events-none absolute -top-24 left-1/4 w-175 h-100 rounded-full bg-amber-200/30 blur-3xl opacity-60" />
+        <div className="pointer-events-none absolute bottom-0 right-0 w-175 h-100 rounded-full bg-orange-100/20 blur-3xl opacity-60" />
+
+        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+          {/* Header */}
+          <motion.div
+            {...fadeUp(0)}
+            className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+          >
+            <div>
+              <motion.div
+                {...fadeIn(0.1)}
+                className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 mb-3"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+                  User Dashboard
+                </span>
+              </motion.div>
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                RacePass{" "}
+                <span className="text-amber-500 underline decoration-amber-200 underline-offset-4">
+                  Control
+                </span>
+              </h1>
+              <p className="mt-2 text-gray-500 font-medium">
+                Manage your digital identity, reputation, and racing assets.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md border border-amber-100 rounded-2xl px-4 py-2 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold">
+                {address?.substring(2, 4).toUpperCase()}
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-900">Ethereum Address</p>
-                <p className="text-sm text-gray-500 font-mono">{address}</p>
+              <div>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                  Connected Wallet
+                </p>
+                <p className="text-xs font-mono text-gray-600 font-semibold">
+                  {address?.substring(0, 6)}...
+                  {address?.substring(address.length - 4)}
+                </p>
               </div>
             </div>
-            <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-800">
-              Connected
-            </span>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* KYC Status */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Session Section */}
-          <div className="lg:col-span-2">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              RacePass Identity
-            </h2>
-            
-            {profileLoading ? (
-              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-500">Loading your identity...</p>
-              </div>
-            ) : profile?.identity ? (
-              <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-2xl font-bold">RacePass ID</h3>
-                    <p className="text-blue-100 text-sm">Soulbound Identity Token</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-4xl font-bold">#{profile.identity.tokenId}</p>
-                    {profile.identity.isRevoked && (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500 text-white mt-1">
-                        REVOKED
-                      </span>
-                    )}
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* ── LEFT: IDENTITY CARD ────────────────────────────────────────── */}
+            <motion.div {...fadeUp(0.1)} className="lg:col-span-8 space-y-6">
+              {profileLoading ? (
+                <div className="bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-12 text-center shadow-xl shadow-amber-900/5">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
+                  <p className="mt-4 text-gray-500 font-medium">
+                    Syncing profile...
+                  </p>
                 </div>
+              ) : profile?.identity ? (
+                <div className="relative group overflow-hidden bg-linear-to-br from-amber-500 to-orange-600 rounded-3xl p-8 text-white shadow-2xl shadow-orange-600/20">
+                  {/* Decorative Elements */}
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/20 transition-all duration-700" />
+                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full -ml-10 -mb-10 blur-2xl" />
 
-                <div className="mb-6">
-                  <div className="bg-white/10 rounded-lg p-4 flex items-center justify-between border border-white/5">
-                    <div>
-                      <p className="text-blue-200 text-xs mb-1">Reputation Score</p>
-                      <p className="text-4xl font-bold">{profile.identity.activeReputation}</p>
-                      <p className="text-blue-200 text-[10px] mt-1 italic opacity-80">Live trust score with dynamic decay</p>
+                  <div className="relative flex flex-col md:flex-row justify-between gap-8">
+                    <div className="space-y-6">
+                      <div>
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-bold uppercase tracking-widest border border-white/30 backdrop-blur-md">
+                            Universal Racing License
+                          </span>
+                          {profile.identity.isKycVerified && (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-green-200">
+                              <div className="w-1 h-1 bg-green-300 rounded-full animate-pulse" />
+                              VERIFIED
+                            </span>
+                          )}
+                        </div>
+                        <h2 className="text-5xl font-black tracking-tighter flex items-center gap-4">
+                          RacePass ID
+                          <span className="text-amber-200/50 text-3xl font-light">
+                            #{profile.identity.tokenId}
+                          </span>
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 group/stat hover:bg-white/15 transition-colors">
+                          <p className="text-xs font-bold text-amber-100 uppercase tracking-widest mb-1">
+                            Reputation Score
+                          </p>
+                          <div className="flex items-end gap-2">
+                            <span className="text-4xl font-black">
+                              {profile.identity.activeReputation}
+                            </span>
+                            <span className="text-xs mb-1 text-green-300 font-bold">
+                              Good Standing
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4">
+                          <p className="text-xs font-bold text-amber-100 uppercase tracking-widest mb-1">
+                            Status
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div
+                              className={`w-2 h-2 rounded-full ${profile.identity.isRevoked ? "bg-red-400" : "bg-green-400 animate-pulse"}`}
+                            />
+                            <span className="text-lg font-bold">
+                              {profile.identity.isRevoked
+                                ? "Revoked"
+                                : "Active"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="inline-flex items-center px-2 py-1 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold uppercase tracking-widest">
-                        Excellent
+
+                    <div className="flex flex-col justify-between items-end">
+                      <div className="text-right">
+                        <p className="text-[10px] text-amber-100 font-bold uppercase tracking-widest">
+                          Last Activity
+                        </p>
+                        <p className="text-sm font-semibold text-white/90">
+                          {profile.identity.lastUpdate}
+                        </p>
+                      </div>
+
+                      <div className="mt-8 md:mt-0 p-3 bg-white rounded-2xl shadow-inner shadow-black/5">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${address}&color=ea580c`}
+                          alt="Identity QR"
+                          className="w-20 h-20 grayscale brightness-90 hover:grayscale-0 transition-all duration-300"
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="border-t border-blue-500/30 pt-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-200 text-sm">KYC Verified</span>
-                    <span className="flex items-center">
-                      {profile.identity.isKycVerified ? (
-                        <>
-                          <svg className="h-5 w-5 text-green-400 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-green-400 font-semibold">Verified</span>
-                        </>
-                      ) : (
-                        <span className="text-yellow-400">Not Verified</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-200 text-sm">Age Verification</span>
-                    <span className="text-white font-semibold">
-                      {profile.identity.isOver18 ? '18+' : 'Under 18'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-blue-200 text-sm">Last Updated</span>
-                    <span className="text-white text-sm">{profile.identity.lastUpdate}</span>
-                  </div>
-                </div>
-
-                {profile.verifiableAttestations && profile.verifiableAttestations.length > 0 && (
-                  <div className="border-t border-blue-500/30 pt-4 mt-4">
-                    <p className="text-blue-200 text-sm mb-2">Portable Credentials</p>
-                    <div className="flex space-x-2">
-                      {profile.verifiableAttestations.slice(0, 3).map((attestation) => (
-                        <div key={attestation.uid} className="bg-white/10 rounded px-3 py-1 text-xs">
-                          {attestation.eventName}
-                        </div>
-                      ))}
-                      {profile.verifiableAttestations.length > 3 && (
-                        <div className="bg-white/10 rounded px-3 py-1 text-xs">
-                          +{profile.verifiableAttestations.length - 3} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-                <svg
-                  className="mx-auto h-12 w-12 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                <h3 className="mt-4 text-lg font-medium text-gray-900">
-                  No RacePass Identity Found
-                </h3>
-                <p className="mt-2 text-gray-600">
-                  Complete KYC verification to mint your on-chain identity
-                </p>
-                <Link
-                  href="/kyc"
-                  className="mt-6 inline-flex items-center rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-500"
-                >
-                  Start KYC Verification
-                </Link>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Quick Actions
-            </h2>
-            <div className="space-y-3">
-              <Link
-                href="/events"
-                className="block w-full rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center">
-                  <div className="flex-shrink-0">
+              ) : (
+                <div className="bg-white border border-amber-100 rounded-3xl p-12 text-center shadow-lg shadow-amber-900/5">
+                  <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg
-                      className="h-6 w-6 text-blue-600"
+                      className="w-10 h-10 text-amber-500"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-2">
+                    No Racing Identity Found
+                  </h3>
+                  <p className="text-gray-500 max-w-sm mx-auto mb-8">
+                    Complete your KYC verification to mint your Soulbound
+                    Universal Racing License and build your reputation.
+                  </p>
+                  <Link
+                    href="/kyc"
+                    className="inline-flex items-center gap-2 rounded-full bg-linear-to-r from-amber-500 to-orange-600 px-8 py-4 text-sm font-bold text-white shadow-xl shadow-orange-500/20 hover:scale-105 transition-transform"
+                  >
+                    Start Verification Flow
+                    <svg
+                      className="w-4 h-4"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -323,426 +336,425 @@ export default function DashboardPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         strokeWidth={2}
-                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        d="M13 7l5 5m0 0l-5 5m5-5H6"
                       />
                     </svg>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-900">Browse Events</p>
-                    <p className="text-xs text-gray-500">Find upcoming events</p>
-                  </div>
+                  </Link>
                 </div>
-              </Link>
-
-              {!profile?.identity && (
-                <Link
-                  href="/kyc"
-                  className="block w-full rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-6 w-6 text-blue-600"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Complete KYC</p>
-                      <p className="text-xs text-gray-500">Verify your identity</p>
-                    </div>
-                  </div>
-                </Link>
               )}
 
-              {profile?.tickets && profile.tickets.length > 0 ? (
-                <Link
-                  href="#tickets"
-                  className="block w-full rounded-lg border border-gray-200 bg-white p-4 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <svg
-                          className="h-6 w-6 text-blue-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-gray-900">My Tickets</p>
-                        <p className="text-xs text-gray-500">{profile.tickets.length} ticket{profile.tickets.length !== 1 ? 's' : ''}</p>
-                      </div>
-                    </div>
-                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                      {profile.tickets.length}
+              {/* ── TICKETS GRID ────────────────────────────────────────── */}
+              <div className="pt-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                    Digital Event Passes
+                    <span className="text-sm font-medium text-gray-400 ml-2">
+                      {profile?.tickets?.length || 0} Assets
                     </span>
-                  </div>
-                </Link>
-              ) : (
-                <div className="block w-full rounded-lg border border-gray-200 bg-gray-50 p-4 opacity-50 cursor-not-allowed">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-6 w-6 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-500">My Tickets</p>
-                      <p className="text-xs text-gray-400">No tickets yet</p>
-                    </div>
-                  </div>
+                  </h3>
+                  <Link
+                    href="/events"
+                    className="text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors uppercase tracking-widest"
+                  >
+                    Browse More →
+                  </Link>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
 
-        {/* Tickets Section */}
-        {profile?.tickets && profile.tickets.length > 0 && (
-          <div id="tickets" className="mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">My Event Tickets</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {profile.tickets.map((ticket) => (
-                <div
-                  key={ticket.dbId}
-                  className={`rounded-lg border-2 p-4 ${
-                    ticket.isCheckedIn
-                      ? 'border-gray-300 bg-gray-50'
-                      : 'border-blue-300 bg-blue-50'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">{ticket.eventName}</h3>
-                      <p className="text-xs text-gray-500 font-mono">#{ticket.onChainId}</p>
+                {profile?.tickets && profile.tickets.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {profile.tickets.map((ticket, idx) => (
+                      <motion.div
+                        key={ticket.dbId}
+                        {...fadeUp(0.1 + idx * 0.05)}
+                        className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:shadow-xl ${
+                          ticket.isCheckedIn
+                            ? "bg-gray-50/50 border-gray-100 grayscale"
+                            : "bg-white border-amber-100 hover:border-amber-300 shadow-md shadow-amber-900/5"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest opacity-80">
+                              Reserved Access
+                            </p>
+                            <h4 className="text-lg font-black text-gray-900 group-hover:text-amber-600 transition-colors">
+                              {ticket.eventName}
+                            </h4>
+                            <p className="text-xs font-mono text-gray-400">
+                              TKT-ID: {ticket.onChainId}
+                            </p>
+                          </div>
+                          <div
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${
+                              ticket.isCheckedIn
+                                ? "bg-gray-100 text-gray-400 border-gray-200"
+                                : "bg-amber-50 text-amber-600 border-amber-200 shadow-inner"
+                            }`}
+                          >
+                            {ticket.isCheckedIn ? "✓ Used" : "Valid"}
+                          </div>
+                        </div>
+
+                        <div className="mt-6 flex items-center justify-between">
+                          <div className="flex -space-x-2">
+                            <div className="w-6 h-6 rounded-full border-2 border-white bg-amber-100" />
+                            <div className="w-6 h-6 rounded-full border-2 border-white bg-orange-100" />
+                          </div>
+                          <div className="flex gap-2">
+                            {!ticket.isCheckedIn && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setShowQrModal(true);
+                                  }}
+                                  className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                  title="Show Entry QR"
+                                >
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                                    />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTicket(ticket);
+                                    setShowTransferModal(true);
+                                  }}
+                                  className="p-2 rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
+                                  title="Transfer Ticket"
+                                >
+                                  <svg
+                                    className="w-5 h-5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                                    />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Card Edge Cut-outs (Stylistic) */}
+                        <div className="absolute top-1/2 -left-2 w-4 h-4 bg-white border border-transparent rounded-full -translate-y-1/2 shadow-inner" />
+                        <div className="absolute top-1/2 -right-2 w-4 h-4 bg-white border border-transparent rounded-full -translate-y-1/2 shadow-inner" />
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white/50 border border-dashed border-amber-200 rounded-3xl p-10 text-center">
+                    <p className="text-gray-400 font-medium italic">
+                      No active tickets found in your wallet.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* ── RIGHT: SIDEBAR (STATS & FEED) ───────────────────────────────── */}
+            <motion.div {...fadeUp(0.2)} className="lg:col-span-4 space-y-6">
+              {/* Quick Access Card */}
+              <div className="bg-white border border-amber-100 rounded-3xl p-6 shadow-xl shadow-amber-900/5">
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">
+                  Quick Ecosystem
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <Link
+                    href="/events"
+                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-100"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-2 shadow-sm shadow-amber-500/10">
+                      🎟️
                     </div>
-                    {ticket.isCheckedIn ? (
-                      <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
-                        ✓ Used
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-blue-600 px-2 py-1 text-xs font-medium text-white">
-                        Valid
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-1 text-xs text-gray-600 mb-3">
-                    <p>Minted: {new Date(ticket.mintedAt).toLocaleDateString()}</p>
-                    {ticket.txHash && (
-                      <a
-                        href={`https://testnet.monadscan.com/tx/${ticket.txHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-500 block"
-                      >
-                        View Transaction →
-                      </a>
-                    )}
-                  </div>
-                  {!ticket.isCheckedIn && (
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setShowQrModal(true);
-                        }}
-                        className="w-full mt-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-                      >
-                        📱 Show QR Code for Entry
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setShowTransferModal(true);
-                        }}
-                        className="w-full rounded-lg bg-purple-100 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-200"
-                      >
-                        🔄 Transfer Ticket
-                      </button>
+                    <span className="text-[10px] font-black text-amber-700 uppercase">
+                      Buy Tickets
+                    </span>
+                  </Link>
+                  <Link
+                    href="/kyc"
+                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-100"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-2 shadow-sm shadow-orange-500/10">
+                      🛡️
+                    </div>
+                    <span className="text-[10px] font-black text-orange-700 uppercase">
+                      Verify KYC
+                    </span>
+                  </Link>
+                </div>
+              </div>
+
+              {/* Reputation Ledger */}
+              <div className="bg-white border border-amber-100 rounded-3xl overflow-hidden shadow-xl shadow-amber-900/5">
+                <div className="p-5 border-b border-amber-50 flex items-center justify-between bg-linear-to-r from-amber-50/50 to-transparent">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">
+                    Trust Ledger
+                  </h3>
+                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                </div>
+
+                <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                  {profile?.reputationHistory &&
+                  profile.reputationHistory.length > 0 ? (
+                    <div className="divide-y divide-amber-50">
+                      {profile.reputationHistory.map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-4 hover:bg-amber-50/30 transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <p
+                              className={`text-[10px] font-black uppercase tracking-widest ${log.type === "add" ? "text-green-600" : "text-red-600"}`}
+                            >
+                              {log.type === "add"
+                                ? "Contribution"
+                                : "Infraction"}
+                            </p>
+                            <span className="text-[10px] text-gray-300 font-mono">
+                              {new Date(log.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-gray-700 leading-tight mb-2">
+                            {log.reason}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              <span
+                                className={`text-sm font-black ${log.type === "add" ? "text-green-500" : "text-red-500"}`}
+                              >
+                                {log.type === "add" ? "+" : "-"}
+                                {log.amount}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400">
+                                REP
+                              </span>
+                            </div>
+                            {log.tx_hash && (
+                              <a
+                                href={`https://testnet.monadscan.com/tx/${log.tx_hash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[10px] font-bold text-amber-500 hover:underline"
+                              >
+                                TX →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-10 text-center">
+                      <p className="text-xs text-gray-400 italic">
+                        No ledger entries yet.
+                      </p>
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Reputation History Feed */}
-        {profile?.reputationHistory && profile.reputationHistory.length > 0 && (
-          <div className="mt-12">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-900">Reputation Ledger</h2>
-              <span className="text-sm text-gray-500 font-medium">Detailed Trust History</span>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-              <div className="max-h-[400px] overflow-y-auto divide-y divide-gray-100">
-                {profile.reputationHistory.map((log) => (
-                  <div key={log.id} className="p-4 hover:bg-gray-50 flex items-center justify-between transition-colors">
-                    <div className="flex items-center">
-                      <div className={`p-2.5 rounded-xl mr-4 ${
-                        log.type === 'add' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
-                      }`}>
-                        {log.type === 'add' ? (
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        ) : (
-                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                          </svg>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">{log.reason}</p>
-                        <div className="flex items-center mt-0.5 space-x-2">
-                          <span className="text-xs text-gray-400">
-                            {new Date(log.created_at).toLocaleDateString()} at {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-xs text-gray-300">•</span>
-                          <span className={`text-[10px] uppercase font-bold tracking-wider ${
-                            log.type === 'add' ? 'text-green-500' : 'text-red-500'
-                          }`}>
-                            {log.type === 'add' ? 'Trust Earned' : 'Trust Deducted'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-black ${
-                        log.type === 'add' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {log.type === 'add' ? '+' : '-'}{log.amount}
-                      </p>
-                      {log.tx_hash && (
-                        <a 
-                          href={`https://testnet.monadscan.com/tx/${log.tx_hash}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-[10px] text-blue-500 hover:text-blue-700 font-mono mt-1"
-                        >
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          {log.tx_hash.substring(0, 8)}...
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
               </div>
-              {profile.reputationHistory.length === 0 && (
-                <div className="p-8 text-center bg-gray-50/50">
-                  <p className="text-gray-500 text-sm italic">No reputation events recorded yet.</p>
-                </div>
-              )}
-            </div>
+            </motion.div>
           </div>
-        )}
+        </div>
 
-        {/* QR Code Modal */}
-        {showQrModal && selectedTicket && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-md w-full p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Entry Pass</h2>
+        {/* ── MODALS ────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showQrModal && selectedTicket && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 px-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                className="bg-white rounded-[40px] max-w-sm w-full p-8 shadow-2xl relative border border-amber-100"
+              >
                 <button
                   onClick={() => {
                     setShowQrModal(false);
                     setSelectedTicket(null);
                   }}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="absolute top-6 right-6 text-gray-400 hover:text-gray-900 transition-colors"
                 >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="h-6 w-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                 </button>
-              </div>
 
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedTicket.eventName}</h3>
-                <p className="text-sm text-gray-500 mb-6">Ticket #{selectedTicket.onChainId}</p>
+                <div className="text-center mt-4">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 mb-4 border border-amber-100">
+                    <span className="h-1 w-1 rounded-full bg-amber-500" />
+                    <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                      Entry Pass
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-black text-gray-900 mb-1">
+                    {selectedTicket.eventName}
+                  </h3>
+                  <p className="text-xs font-mono text-gray-400 mb-8">
+                    Ticket #{selectedTicket.onChainId}
+                  </p>
 
-                {/* QR Code */}
-                <div className="bg-white p-4 rounded-lg border-2 border-gray-200 mb-6">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`}
-                    alt="QR Code"
-                    className="mx-auto"
-                  />
-                </div>
+                  <div className="bg-amber-50 p-6 rounded-[32px] border-2 border-dashed border-amber-200 mb-8">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${address}&color=ea580c`}
+                      alt="QR Code"
+                      className="mx-auto w-48 h-48 mix-blend-multiply transition-transform hover:scale-105 duration-500"
+                    />
+                  </div>
 
-                <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <p className="text-xs text-blue-800 font-semibold mb-2">Your Wallet Address:</p>
-                  <code className="text-xs text-blue-900 break-all block bg-white p-2 rounded">
-                    {address}
-                  </code>
-                </div>
-
-                <div className="text-xs text-gray-500 space-y-2">
-                  <p>📱 Show this QR code to the gate scanner at the event entrance</p>
-                  <p>🔐 This QR contains your wallet address for identity verification</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Transfer Modal */}
-        {showTransferModal && selectedTicket && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-md w-full p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Transfer Ticket</h2>
-                <button
-                  onClick={() => {
-                    setShowTransferModal(false);
-                    setTransferRecipient('');
-                    setTransferError('');
-                    setSelectedTicket(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-blue-900 mb-2">Ticket Details</h3>
-                  <p className="text-sm text-blue-800"><strong>Event:</strong> {selectedTicket.eventName}</p>
-                  <p className="text-sm text-blue-800"><strong>Token ID:</strong> #{selectedTicket.onChainId}</p>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex">
-                    <svg className="h-5 w-5 text-yellow-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
-                    <div>
-                      <h3 className="text-sm font-semibold text-yellow-900 mb-1">Important Notice</h3>
-                      <p className="text-xs text-yellow-800">
-                        Tickets can only be transferred to wallets with a valid RacePass Identity. 
-                        The recipient must have completed KYC verification first.
-                      </p>
+                  <div className="space-y-4 text-xs font-bold text-gray-500">
+                    <div className="flex items-center gap-3 justify-center text-amber-600">
+                      <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[10px]">
+                        1
+                      </span>
+                      <span>Show at Entrance</span>
+                    </div>
+                    <div className="flex items-center gap-3 justify-center">
+                      <span className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center text-[10px]">
+                        2
+                      </span>
+                      <span>Verified via Wallet</span>
                     </div>
                   </div>
                 </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                <div>
-                  <label htmlFor="recipient" className="block text-sm font-medium text-gray-700 mb-2">
-                    Recipient Wallet Address *
-                  </label>
-                  <input
-                    type="text"
-                    id="recipient"
-                    value={transferRecipient}
-                    onChange={(e) => {
-                      setTransferRecipient(e.target.value);
-                      setTransferError('');
-                    }}
-                    placeholder="0x..."
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 font-mono text-sm p-3 border"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Enter the Ethereum address of the recipient
-                  </p>
-                </div>
-
-                {transferError && (
-                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                    <p className="text-sm text-red-800">❌ {transferError}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
+        <AnimatePresence>
+          {showTransferModal && selectedTicket && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 px-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, y: 20 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0.9, y: 20 }}
+                className="bg-white rounded-[40px] max-w-md w-full p-8 shadow-2xl relative border border-amber-100"
+              >
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                    Transfer <span className="text-amber-500">Asset</span>
+                  </h2>
                   <button
                     onClick={() => {
                       setShowTransferModal(false);
-                      setTransferRecipient('');
-                      setTransferError('');
+                      setTransferRecipient("");
+                      setTransferError("");
                       setSelectedTicket(null);
                     }}
-                    className="flex-1 rounded-lg bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-                    disabled={isTransferring}
+                    className="text-gray-400 hover:text-gray-900"
                   >
-                    Cancel
+                    <svg
+                      className="h-6 w-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
+                    </svg>
                   </button>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">
+                      Asset Information
+                    </p>
+                    <p className="text-sm font-bold text-gray-800">
+                      {selectedTicket.eventName}
+                    </p>
+                    <p className="text-xs font-mono text-gray-400">
+                      # {selectedTicket.onChainId}
+                    </p>
+                  </div>
+
+                  <div className="bg-linear-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-2xl p-4 flex gap-4">
+                    <div className="text-2xl">⚠️</div>
+                    <p className="text-[10px] font-bold text-orange-800 leading-relaxed uppercase">
+                      Warning: Recipients must have a valid RacePass Identity to
+                      accept this ticket. Non-compliant wallets will be rejected
+                      on-chain.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                      Recipient Address
+                    </label>
+                    <input
+                      type="text"
+                      value={transferRecipient}
+                      onChange={(e) => {
+                        setTransferRecipient(e.target.value);
+                        setTransferError("");
+                      }}
+                      placeholder="0x..."
+                      className="w-full rounded-2xl border-amber-100 shadow-inner bg-amber-50/30 focus:border-amber-500 focus:ring-amber-500 font-mono text-xs p-4 border"
+                    />
+                  </div>
+
+                  {transferError && (
+                    <div className="bg-red-50 text-red-600 text-[10px] font-bold p-3 rounded-xl border border-red-100 text-center">
+                      {transferError}
+                    </div>
+                  )}
+
                   <button
                     onClick={handleTransferTicket}
                     disabled={isTransferring || !transferRecipient.trim()}
-                    className={`flex-1 rounded-lg px-4 py-3 text-sm font-semibold text-white ${
+                    className={`w-full rounded-full py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl transition-all ${
                       isTransferring || !transferRecipient.trim()
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-purple-600 hover:bg-purple-500'
+                        ? "bg-gray-200 cursor-not-allowed text-gray-400"
+                        : "bg-linear-to-r from-amber-500 to-orange-600 shadow-orange-500/20 hover:scale-[1.02]"
                     }`}
                   >
-                    {isTransferring ? 'Transferring...' : '🔄 Transfer Ticket'}
+                    {isTransferring ? "Processing..." : "Confirm Transfer"}
                   </button>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Security Info */}
-        <div className="mt-8 bg-blue-50 rounded-xl border border-blue-200 p-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">Security & Privacy</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  Your credentials are cryptographically signed and stored securely. Only you
-                  control who can access your verification status. Your personal data never
-                  appears on the blockchain.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

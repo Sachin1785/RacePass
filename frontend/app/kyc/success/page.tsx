@@ -105,29 +105,14 @@ export default function KycSuccessPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'completed':
-        return 'text-green-600 bg-green-100';
-      case 'pending':
-      case 'in review':
-        return 'text-yellow-600 bg-yellow-100';
-      case 'declined':
-        return 'text-red-600 bg-red-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white font-sans text-gray-900">
       <Navbar />
       
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
