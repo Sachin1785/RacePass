@@ -501,7 +501,7 @@ export default function DashboardPage() {
               <div className="bg-white border border-amber-100 rounded-3xl overflow-hidden shadow-xl shadow-amber-900/5">
                 <div className="p-5 border-b border-amber-50 flex items-center justify-between bg-linear-to-r from-amber-50/50 to-transparent">
                   <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">
-                    Trust Ledger
+                    Reputation Ledger
                   </h3>
                   <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
                 </div>

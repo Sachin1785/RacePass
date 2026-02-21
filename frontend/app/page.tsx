@@ -2,8 +2,6 @@
 
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 
@@ -61,22 +59,7 @@ const stats = [
 
 export default function Home() {
   const { isConnected } = useAccount();
-  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
-  const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
-
-  // Wait for client-side hydration
-  useEffect(() => {
-    const timer = setTimeout(() => setIsClient(true), 0);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Redirect verified users to dashboard
-  useEffect(() => {
-    if (isClient && !profileLoading && profile?.identity?.isKycVerified) {
-      router.push('/dashboard');
-    }
-  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
+  const { data: profile } = useRacePassProfile();
 
   return (
     <div className="min-h-screen bg-white font-sans">

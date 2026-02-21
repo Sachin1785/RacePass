@@ -11,7 +11,6 @@ export function Sidebar() {
   const { data: profile } = useRacePassProfile();
 
   const links = [
-    { href: '/', label: 'Home', icon: '🏠' },
     { href: '/events', label: 'Events', icon: '🎟️' },
     { href: '/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/credentials', label: 'Credentials', icon: '🛡️' },
