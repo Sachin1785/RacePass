@@ -5,7 +5,7 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  {
+    {
     rules: {
       "@typescript-eslint/no-explicit-any": "off", // Set the rule to "off" or 0
       // ... other rules

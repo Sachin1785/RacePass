@@ -8,11 +8,37 @@ export function KycForm() {
   const router = useRouter();
   const { address } = useAccount();
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingKyc, setIsCheckingKyc] = useState(true);
   const [error, setError] = useState<string>('');
   const [isSdkLoaded, setIsSdkLoaded] = useState(false);
 
+  // Check if user is already KYC verified before loading SDK
+  useEffect(() => {
+    const checkKycStatus = async () => {
+      if (!address) return;
+      
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kyc/status/${address.toLowerCase()}`);
+        const result = await response.json();
+        
+        if (result.success && result.isVerified) {
+          // Already verified, redirect to dashboard or success with a flag
+          router.push('/dashboard');
+        }
+      } catch (err) {
+        console.warn('KYC status check failed, proceeding with normal flow:', err);
+      } finally {
+        setIsCheckingKyc(false);
+      }
+    };
+
+    checkKycStatus();
+  }, [address, router]);
+
   // Load Didit SDK dynamically
   useEffect(() => {
+    if (isCheckingKyc) return; // Don't load until we mark check as done
+    
     const loadSdk = async () => {
       try {
         await import('@didit-protocol/sdk-web');
@@ -23,7 +49,7 @@ export function KycForm() {
       }
     };
     loadSdk();
-  }, []);
+  }, [isCheckingKyc]);
 
   const startVerification = async () => {
     if (!isSdkLoaded) {
@@ -125,6 +151,15 @@ export function KycForm() {
       setIsLoading(false);
     }
   };
+
+  if (isCheckingKyc) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-500 text-sm">Checking KYC status...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">

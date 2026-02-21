@@ -21,12 +21,31 @@ let db;
             token_id TEXT,
             issued_at DATETIMEDEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            date TEXT NOT NULL,
+            location TEXT NOT NULL,
+            description TEXT,
+            price TEXT,
+            image_emoji TEXT,
+            requires_kyc BOOLEAN DEFAULT 1,
+            min_age INTEGER DEFAULT 18,
+            min_reputation INTEGER DEFAULT 0,
+            tickets_minted INTEGER DEFAULT 0,
+            tickets_checked_in INTEGER DEFAULT 0,
+            max_tickets INTEGER DEFAULT 1000,
+            is_active BOOLEAN DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS tickets (
             ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
             on_chain_id TEXT,
             owner_address TEXT,
+            event_id INTEGER,
             tx_hash TEXT,
-            minted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            minted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (event_id) REFERENCES events(event_id)
         );
         CREATE TABLE IF NOT EXISTS reputation_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +66,34 @@ let db;
         );
     `);
     console.log("SQLite Database initialized.");
+    
+    // Migration: Add event_id column to tickets table if it doesn't exist
+    try {
+        const tableInfo = await db.all("PRAGMA table_info(tickets)");
+        const hasEventId = tableInfo.some(col => col.name === 'event_id');
+        
+        if (!hasEventId) {
+            console.log("Migrating tickets table: adding event_id column...");
+            await db.run('ALTER TABLE tickets ADD COLUMN event_id INTEGER REFERENCES events(event_id)');
+            console.log("Migration completed successfully.");
+        }
+    } catch (error) {
+        console.error("Migration error:", error);
+    }
+    
+    // Seed sample events if table is empty
+    const eventCount = await db.get('SELECT COUNT(*) as count FROM events');
+    if (eventCount.count === 0) {
+        console.log("Seeding sample events...");
+        await db.run(`
+            INSERT INTO events (name, date, location, description, price, image_emoji, requires_kyc, min_age, min_reputation) VALUES
+            ('Formula E Championship 2026', '2026-03-15', 'Mumbai, India', 'Experience the future of racing with electric vehicles', '₹5,000', '🏎️', 1, 18, 50),
+            ('Tech Conference 2026', '2026-04-22', 'Bangalore, India', 'Join industry leaders in blockchain and AI innovation', '₹2,500', '💻', 1, 16, 0),
+            ('Music Festival Summer', '2026-06-10', 'Goa, India', 'A weekend of electronic music and beach vibes', '₹8,000', '🎵', 1, 21, 0),
+            ('Crypto Summit 2026', '2026-05-05', 'Dubai, UAE', 'Explore the future of decentralized finance', '$500', '₿', 1, 18, 100)
+        `);
+        console.log("Sample events seeded successfully.");
+    }
 })();
 
 // Contract Artifacts (built by Hardhat)
@@ -54,6 +101,25 @@ const IdentityArtifact = require("./artifacts/contracts/RacePassIdentity.sol/Rac
 const TicketArtifact = require("./artifacts/contracts/RacePassTicket.sol/RacePassTicket.json");
 
 const app = express();
+
+// Fix for "Private Network Access" CORS issues (Public site -> Localhost API)
+app.use((req, res, next) => {
+    // If browser asks for private network access, allow it
+    if (req.headers['access-control-request-private-network']) {
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
+    
+    // Allow all origins, methods, and headers for the hackathon
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Authorization');
+    
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -118,7 +184,14 @@ async function issueAttestationHelper(recipient, eventName, reputationValue) {
         console.log(`Auto-adding ${reputationValue} core reputation to Token ID ${user.token_id}...`);
         try {
             const tx = await identityContract.addReputation(user.token_id, reputationValue, "Attestation: " + eventName);
-            await tx.wait();
+            const receipt = await tx.wait();
+
+            // Log the automated reputation change to the history table
+            await db.run(
+                'INSERT INTO reputation_logs (token_id, amount, type, reason, tx_hash) VALUES (?, ?, ?, ?, ?)',
+                [user.token_id, reputationValue, 'add', "Auto-Reward: " + eventName, receipt.hash]
+            );
+            console.log(`Reputation history logged for Token ID ${user.token_id}`);
         } catch (e) {
             console.warn("Reputation update skipped (likely insufficient balance or network issue):", e.message);
         }
@@ -133,6 +206,44 @@ app.post("/api/attest/issue", async (req, res) => {
         res.json({ success: true, uid: attestation.uid, attestation });
     } catch (error) {
         console.error("EAS Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// --- KYC CHECK ENDPOINT ---
+app.get("/api/kyc/status/:address", async (req, res) => {
+    try {
+        const address = req.params.address.toLowerCase();
+        
+        // Check if user exists in our local DB first
+        const user = await db.get('SELECT * FROM users WHERE address = ?', [address]);
+        
+        if (!user || !user.token_id) {
+            return res.json({ 
+                success: true, 
+                isVerified: false, 
+                message: "No RacePass identity found for this wallet." 
+            });
+        }
+
+        // verify on-chain status
+        try {
+            const data = await identityContract.identityData(user.token_id);
+            res.json({
+                success: true,
+                isVerified: data.isKycVerified,
+                tokenId: user.token_id,
+                onChainData: {
+                    isKycVerified: data.isKycVerified,
+                    isOver18: data.isOver18,
+                    isRevoked: data.isRevoked
+                }
+            });
+        } catch (e) {
+            // If token exists in DB but not on chain (rare), treat as not verified
+            res.json({ success: true, isVerified: false, error: "Token found in DB but could not fetch from chain" });
+        }
+    } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -206,6 +317,17 @@ app.post("/api/identity/issue", async (req, res) => {
     try {
         const { address, isKycVerified, isOver18, initialReputation } = req.body;
         console.log(`Issuing identity for ${address}...`);
+
+        // Check if user already exists to prevent duplicate minting
+        const existingUser = await db.get('SELECT * FROM users WHERE address = ?', [address.toLowerCase()]);
+        if (existingUser && existingUser.token_id && existingUser.token_id !== "Unknown") {
+            return res.json({ 
+                success: true, 
+                message: "Identity already exists", 
+                tokenId: existingUser.token_id,
+                alreadyIssued: true 
+            });
+        }
 
         const tx = await identityContract.issueIdentity(
             address,
@@ -285,8 +407,22 @@ app.get("/api/identity/:tokenId", async (req, res) => {
 // Mint programmatic ticket
 app.post("/api/tickets/mint", async (req, res) => {
     try {
-        const { to, eventName, requireAge18, minReputation, maxResalePrice } = req.body;
-        console.log(`Minting ticket for ${eventName} to ${to}...`);
+        const { to, eventId, eventName, requireAge18, minReputation, maxResalePrice } = req.body;
+        console.log(`Minting ticket for ${eventName} (Event ID: ${eventId}) to ${to}...`);
+
+        // Get event details if eventId is provided
+        let dbEventId = eventId;
+        if (eventId) {
+            const event = await db.get('SELECT * FROM events WHERE event_id = ?', [eventId]);
+            if (!event) {
+                return res.status(404).json({ success: false, error: "Event not found" });
+            }
+            
+            // Check if event is sold out
+            if (event.tickets_minted >= event.max_tickets) {
+                return res.status(400).json({ success: false, error: "Event is sold out" });
+            }
+        }
 
         const tx = await ticketContract.issueTicket(
             to,
@@ -298,15 +434,19 @@ app.post("/api/tickets/mint", async (req, res) => {
         const receipt = await tx.wait();
 
         // Extract Token ID from events
-        // Note: The event name depends on the contract, usually 'TicketIssued' or 'Transfer'
         const event = receipt.logs.find(log => log.fragment && log.fragment.name === 'TicketIssued');
         const onChainId = event ? event.args[1].toString() : "Unknown";
 
-        // Store ticket in DB
+        // Store ticket in DB with event_id
         await db.run(
-            'INSERT INTO tickets (on_chain_id, owner_address, tx_hash) VALUES (?, ?, ?)',
-            [onChainId, to.toLowerCase(), receipt.hash]
+            'INSERT INTO tickets (on_chain_id, owner_address, event_id, tx_hash) VALUES (?, ?, ?, ?)',
+            [onChainId, to.toLowerCase(), dbEventId, receipt.hash]
         );
+
+        // Increment event's tickets_minted counter
+        if (dbEventId) {
+            await updateEventStats(dbEventId, 'tickets_minted');
+        }
 
         res.json({ success: true, txHash: receipt.hash, onChainId });
     } catch (error) {
@@ -344,6 +484,12 @@ app.post("/api/tickets/check-in", async (req, res) => {
         // New: Auto-issue EAS attestation on check-in
         const owner = await ticketContract.ownerOf(tokenId);
         const attestation = await issueAttestationHelper(owner, eventName, rep);
+
+        // Update event check-in counter
+        const ticket = await db.get('SELECT event_id FROM tickets WHERE on_chain_id = ?', [tokenId]);
+        if (ticket && ticket.event_id) {
+            await updateEventStats(ticket.event_id, 'tickets_checked_in');
+        }
 
         res.json({
             success: true,
@@ -406,6 +552,12 @@ app.post("/api/tickets/check-in-by-address", async (req, res) => {
 
         // New: Auto-issue EAS attestation on check-in
         const attestation = await issueAttestationHelper(normalizedAddress, eventName, rep);
+
+        // Update event check-in counter
+        const ticket = await db.get('SELECT event_id FROM tickets WHERE on_chain_id = ?', [targetTokenId]);
+        if (ticket && ticket.event_id) {
+            await updateEventStats(ticket.event_id, 'tickets_checked_in');
+        }
 
         res.json({
             success: true,
@@ -498,6 +650,140 @@ app.get("/api/user/:address", async (req, res) => {
         res.status(500).json({ success: false, error: error.message });
     }
 });
+
+// --- EVENT MANAGEMENT ENDPOINTS ---
+
+// Get all events
+app.get("/api/events", async (req, res) => {
+    try {
+        const events = await db.all(`
+            SELECT 
+                event_id as id,
+                name,
+                date,
+                location,
+                description,
+                price,
+                image_emoji as image,
+                requires_kyc as requiresKyc,
+                min_age as minAge,
+                min_reputation as minReputation,
+                tickets_minted as ticketsMinted,
+                tickets_checked_in as ticketsCheckedIn,
+                max_tickets as maxTickets,
+                is_active as isActive
+            FROM events 
+            WHERE is_active = 1
+            ORDER BY date ASC
+        `);
+        res.json({ success: true, events });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get single event with detailed stats
+app.get("/api/events/:eventId", async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        
+        const event = await db.get(`
+            SELECT 
+                event_id as id,
+                name,
+                date,
+                location,
+                description,
+                price,
+                image_emoji as image,
+                requires_kyc as requiresKyc,
+                min_age as minAge,
+                min_reputation as minReputation,
+                tickets_minted as ticketsMinted,
+                tickets_checked_in as ticketsCheckedIn,
+                max_tickets as maxTickets,
+                is_active as isActive,
+                created_at as createdAt
+            FROM events 
+            WHERE event_id = ?
+        `, [eventId]);
+
+        if (!event) {
+            return res.status(404).json({ success: false, error: "Event not found" });
+        }
+
+        // Get attendee list (addresses that checked in)
+        const attendees = await db.all(`
+            SELECT DISTINCT t.owner_address, t.minted_at
+            FROM tickets t
+            WHERE t.event_id = ?
+            ORDER BY t.minted_at DESC
+        `, [eventId]);
+
+        res.json({ 
+            success: true, 
+            event,
+            attendees,
+            stats: {
+                totalMinted: event.ticketsMinted,
+                totalCheckedIn: event.ticketsCheckedIn,
+                attendanceRate: event.ticketsMinted > 0 ? ((event.ticketsCheckedIn / event.ticketsMinted) * 100).toFixed(1) : 0
+            }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create new event (Admin endpoint)
+app.post("/api/events", async (req, res) => {
+    try {
+        const { 
+            name, 
+            date, 
+            location, 
+            description, 
+            price, 
+            imageEmoji = '🎫',
+            requiresKyc = true,
+            minAge = 18,
+            minReputation = 0,
+            maxTickets = 1000
+        } = req.body;
+
+        if (!name || !date || !location) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Missing required fields: name, date, location" 
+            });
+        }
+
+        const result = await db.run(`
+            INSERT INTO events (name, date, location, description, price, image_emoji, requires_kyc, min_age, min_reputation, max_tickets)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [name, date, location, description, price, imageEmoji, requiresKyc ? 1 : 0, minAge, minReputation, maxTickets]);
+
+        res.json({ 
+            success: true, 
+            eventId: result.lastID,
+            message: "Event created successfully" 
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update event stats (called internally when tickets are minted/checked in)
+async function updateEventStats(eventId, field) {
+    try {
+        await db.run(`UPDATE events SET ${field} = ${field} + 1 WHERE event_id = ?`, [eventId]);
+    } catch (error) {
+        console.error(`Failed to update event stats for field ${field}:`, error);
+    }
+}
 
 const PORT = 3005;
 app.listen(PORT, () => {

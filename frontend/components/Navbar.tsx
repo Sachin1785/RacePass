@@ -37,6 +37,18 @@ export function Navbar() {
               >
                 Dashboard
               </Link>
+              <Link
+                href="/credentials"
+                className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              >
+                Credentials
+              </Link>
+              <Link
+                href="/verify"
+                className="rounded-md px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+              >
+                🔍 Verify
+              </Link>
             </div>
           </div>
           <div>
