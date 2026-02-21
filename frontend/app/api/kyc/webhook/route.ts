@@ -4,6 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
  * Didit webhook endpoint
  * Receives verification results from Didit after user completes verification
  */
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'Didit Webhook endpoint is active. Use POST to send webhook data.',
+    success: true 
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -12,6 +19,7 @@ export async function POST(request: NextRequest) {
       session_id: data.session_id,
       status: data.status,
       timestamp: new Date().toISOString(),
+      image_url: data.decision.face_matches.target_image
     });
 
     // Here you would:
