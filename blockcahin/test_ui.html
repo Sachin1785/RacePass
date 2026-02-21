@@ -130,6 +130,10 @@
             <label>Initial Reputation Score</label>
             <input type="number" id="id-rep" value="100">
             <button onclick="issueIdentity()">Issue Identity</button>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button onclick="revokeId(true)" style="background: #ef4444;">Revoke</button>
+                <button onclick="revokeId(false)" style="background: #10b981;">Un-revoke</button>
+            </div>
             <div id="res-issue" class="result"></div>
         </div>
 
@@ -181,6 +185,8 @@
         <!-- TICKETS -->
         <div class="card">
             <h2>5. Mint NFT Ticket</h2>
+            <label>Event Name</label>
+            <input type="text" id="tk-event" value="Monaco Grand Prix 2026">
             <label>Receiver Wallet Address</label>
             <input type="text" id="tk-address" placeholder="0x...">
             <label>Min Reputation Required to Attend</label>
@@ -189,9 +195,36 @@
             <div id="res-tk" class="result"></div>
         </div>
 
+        <!-- CHECK-IN -->
+        <div class="card">
+            <h2>6. Ticket Check-in (Scan at Door)</h2>
+            <label>Event Name</label>
+            <input type="text" id="checkin-event" value="Monaco Grand Prix 2026">
+
+            <label>Reputation Reward for Attending</label>
+            <input type="number" id="checkin-rep" value="50">
+
+            <div style="border: 1px dashed #444; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #aaa;">Option A: Scan Wallet Address (Auto-find
+                    ticket)</h3>
+                <label>Wallet Address</label>
+                <input type="text" id="checkin-address" placeholder="0x...">
+                <button onclick="checkInByAddress()" style="background: #a855f7;">Magic Scan (By Address)</button>
+            </div>
+
+            <div style="border: 1px dashed #444; padding: 15px; border-radius: 8px;">
+                <h3 style="margin-top: 0; font-size: 14px; color: #aaa;">Option B: Manual Token ID</h3>
+                <label>Ticket Token ID</label>
+                <input type="number" id="checkin-id" placeholder="e.g. 1">
+                <button onclick="checkInTicket()" style="background: #10b981;">Manual Check-in (By ID)</button>
+            </div>
+
+            <div id="res-checkin" class="result"></div>
+        </div>
+
         <!-- STATUS -->
         <div class="card">
-            <h2>6. Verify Token ID</h2>
+            <h2>7. Verify Token ID</h2>
             <label>Identity Token ID</label>
             <input type="number" id="chk-id" placeholder="e.g. 1">
             <button onclick="checkId()" style="background: #3b82f6;">Fetch On-Chain Data</button>
@@ -245,6 +278,37 @@
             btn.innerText = oldText;
         }
 
+        async function revokeId(status) {
+            const id = prompt("Enter Token ID to " + (status ? "revoke" : "restore"));
+            if (!id) return;
+            const res = await post('/identity/revoke', { tokenId: id, status: status });
+            showResult('res-issue', res);
+        }
+
+        async function checkInTicket() {
+            const id = document.getElementById('checkin-id').value;
+            const event = document.getElementById('checkin-event').value;
+            const rep = document.getElementById('checkin-rep').value;
+            const res = await post('/tickets/check-in', {
+                tokenId: id,
+                eventName: event,
+                reputationValue: rep
+            });
+            showResult('res-checkin', res);
+        }
+
+        async function checkInByAddress() {
+            const addr = document.getElementById('checkin-address').value;
+            const event = document.getElementById('checkin-event').value;
+            const rep = document.getElementById('checkin-rep').value;
+            const res = await post('/tickets/check-in-by-address', {
+                address: addr,
+                eventName: event,
+                reputationValue: rep
+            });
+            showResult('res-checkin', res);
+        }
+
         async function updateRep(type) {
             const btn = event.target; const oldText = btn.innerText; btn.innerText = '⚙️ Updating Chain...';
             const res = await post('/identity/reputation', {
@@ -286,12 +350,18 @@
         }
 
         async function mintTicket() {
-            const btn = event.target; const oldText = btn.innerText; btn.innerText = '🎟️ Minting Pass...';
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '🎟️ Minting NFT...';
             const res = await post('/tickets/mint', {
                 to: document.getElementById('tk-address').value,
-                minReputation: document.getElementById('tk-minrep').value
+                eventName: document.getElementById('tk-event').value,
+                minReputation: document.getElementById('tk-minrep').value,
+                maxResalePrice: "0.1",
+                requireAge18: true
             });
             showResult('res-tk', res);
+            if (res.success) {
+                document.getElementById('checkin-id').value = res.onChainId;
+            }
             btn.innerText = oldText;
         }
 

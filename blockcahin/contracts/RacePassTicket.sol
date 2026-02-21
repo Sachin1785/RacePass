@@ -19,8 +19,15 @@ contract RacePassTicket is ERC721, Ownable {
 
     uint256 public nextTicketId;
     
+    // Mapping from Ticket ID to check-in status
+    mapping(uint256 => bool) public checkedIn;
+
+    event TicketIssued(address indexed to, uint256 tokenId);
+    event TicketCheckedIn(uint256 indexed tokenId);
+    
     // Ticket data
     struct TicketInfo {
+        string eventName;
         uint256 maxResalePrice;
         bool requireAge18;
         uint256 minReputation;
@@ -40,6 +47,7 @@ contract RacePassTicket is ERC721, Ownable {
      */
     function issueTicket(
         address to,
+        string calldata eventName,
         bool requireAge18,
         uint256 minReputation,
         uint256 maxResalePrice
@@ -51,12 +59,21 @@ contract RacePassTicket is ERC721, Ownable {
 
         uint256 ticketId = ++nextTicketId;
         ticketDetails[ticketId] = TicketInfo({
+            eventName: eventName,
             maxResalePrice: maxResalePrice,
             requireAge18: requireAge18,
             minReputation: minReputation
         });
 
         _safeMint(to, ticketId);
+        emit TicketIssued(to, ticketId);
+    }
+
+    function checkIn(uint256 tokenId, string calldata eventName) external onlyOwner {
+        require(!checkedIn[tokenId], "Already checked in");
+        require(keccak256(bytes(ticketDetails[tokenId].eventName)) == keccak256(bytes(eventName)), "Ticket is for a different event");
+        checkedIn[tokenId] = true;
+        emit TicketCheckedIn(tokenId);
     }
 
     /**
