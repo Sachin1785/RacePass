@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
@@ -36,6 +37,22 @@ export default function VerifyPage() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [results, setResults] = useState<VerificationResult[]>([]);
   const [presentationType, setPresentationType] = useState<'single' | 'bundle' | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
+
+  // Wait for client-side hydration
+  useEffect(() => {
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Redirect unverified users to KYC
+  useEffect(() => {
+    if (isClient && !profileLoading && !profile?.identity?.isKycVerified) {
+      router.push('/kyc');
+    }
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
 
   const handleVerify = async () => {
     if (!input.trim()) { alert('Please paste a credential or presentation JSON'); return; }
@@ -79,7 +96,6 @@ export default function VerifyPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <Navbar />
 
       <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
         <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #f59e0b22 1px, transparent 0)', backgroundSize: '32px 32px' }} />

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import { Navbar } from '@/components/Navbar';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
@@ -113,8 +112,6 @@ export default function KycSuccessPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <Navbar />
-      
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Success Message */}
         <div className="text-center mb-8">

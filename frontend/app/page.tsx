@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { useAccount } from 'wagmi';
-import { Navbar } from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 
 // ─── Animation Helpers ────────────────────────────────────────────────────────
 const fadeUp = (delay = 0) => ({
@@ -59,10 +61,25 @@ const stats = [
 
 export default function Home() {
   const { isConnected } = useAccount();
+  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
+  const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
+
+  // Wait for client-side hydration
+  useEffect(() => {
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Redirect verified users to dashboard
+  useEffect(() => {
+    if (isClient && !profileLoading && profile?.identity?.isKycVerified) {
+      router.push('/dashboard');
+    }
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <Navbar />
 
       {/* ── HERO ──────────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white">
@@ -105,12 +122,19 @@ export default function Home() {
               </motion.p>
 
               <motion.div {...fadeUp(0.18)} className="mt-8 flex flex-wrap items-center gap-3">
-                {isConnected ? (
+                {isConnected && !profile?.identity?.isKycVerified ? (
                   <Link
                     href="/kyc"
                     className="rounded-xl bg-amber-400 hover:bg-amber-500 px-7 py-3 text-sm font-bold text-white shadow-md shadow-amber-200 hover:shadow-amber-300 transition-all duration-200 hover:-translate-y-0.5"
                   >
                     Complete KYC →
+                  </Link>
+                ) : isConnected && profile?.identity?.isKycVerified ? (
+                  <Link
+                    href="/dashboard"
+                    className="rounded-xl bg-green-500 hover:bg-green-600 px-7 py-3 text-sm font-bold text-white shadow-md shadow-green-200 hover:shadow-green-300 transition-all duration-200 hover:-translate-y-0.5"
+                  >
+                    Go to Dashboard →
                   </Link>
                 ) : (
                   <span className="rounded-xl bg-amber-400 px-7 py-3 text-sm font-bold text-white opacity-60 cursor-not-allowed">

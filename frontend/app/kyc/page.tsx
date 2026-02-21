@@ -1,11 +1,11 @@
 'use client';
 
 import { useAccount } from 'wagmi';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { Navbar } from '@/components/Navbar';
+import { useRouter } from 'next/navigation';
 import { KycForm } from '@/components/KycForm';
 import { motion } from 'framer-motion';
+import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 
 // ─── Animation Helpers ────────────────────────────────────────────────────────
 const fadeUp = (delay = 0) => ({
@@ -22,27 +22,27 @@ const fadeIn = (delay = 0) => ({
 
 export default function KycPage() {
   const { isConnected, isConnecting } = useAccount();
-  const router = useRouter();
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
 
-  // Wait for client-side hydration before checking wallet connection
+  // Wait for client-side hydration
   useEffect(() => {
     const timer = setTimeout(() => setIsClient(true), 0);
     return () => clearTimeout(timer);
   }, []);
 
+  // Redirect verified users to dashboard
   useEffect(() => {
-    // Only check wallet connection after client-side hydration is complete
-    if (isClient && !isConnecting && !isConnected) {
-      router.push('/');
+    if (isClient && !profileLoading && profile?.identity?.isKycVerified) {
+      router.push('/dashboard');
     }
-  }, [isClient, isConnecting, isConnected, router]);
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
 
   // Show loading during SSR or while wagmi is checking connection
   if (!isClient || isConnecting) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
@@ -53,14 +53,12 @@ export default function KycPage() {
     );
   }
 
-  // If not connected after loading finished, this will be caught by useEffect redirect
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <p className="text-gray-500 font-medium">Redirecting...</p>
+            <p className="text-gray-500 font-medium">Please connect your wallet to continue.</p>
           </div>
         </div>
       </div>
@@ -69,7 +67,6 @@ export default function KycPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans">
-      <Navbar />
       
       <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)]">
         {/* Subtle grid bg */}

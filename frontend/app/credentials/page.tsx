@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -36,9 +36,24 @@ export default function CredentialsPage() {
   const [selectedAttestation, setSelectedAttestation] = useState<Attestation | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
   
   // Presentation builder state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
+
+  // Wait for client-side hydration
+  useEffect(() => {
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Redirect unverified users to KYC
+  useEffect(() => {
+    if (isClient && !profileLoading && !profile?.identity?.isKycVerified) {
+      router.push('/kyc');
+    }
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
   const [selectedCredentials, setSelectedCredentials] = useState<Set<string>>(new Set());
   const [showPresentationModal, setShowPresentationModal] = useState(false);
 
@@ -108,7 +123,6 @@ export default function CredentialsPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <Navbar />
       
       <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
         <div className="pointer-events-none absolute inset-0 opacity-40" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #f59e0b22 1px, transparent 0)', backgroundSize: '32px 32px' }} />

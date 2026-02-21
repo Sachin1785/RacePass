@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -108,7 +106,6 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <Navbar />
       
       <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
         {/* Subtle grid bg */}
@@ -142,7 +139,7 @@ export default function EventsPage() {
 
           {/* Verification Status (Toast-like) */}
           <AnimatePresence>
-            {!profile?.identity && (
+            {!profile?.identity?.isKycVerified && (
               <motion.div 
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Navbar } from "@/components/Navbar";
 import { useRacePassProfile } from "@/hooks/useRacePassProfile";
 import { ethers } from "ethers";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,10 +27,10 @@ const stagger = {
 
 export default function DashboardPage() {
   const { address, isConnected, isConnecting } = useAccount();
-  const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const router = useRouter();
 
   // Transfer modal state
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -52,13 +51,14 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Redirect unverified users to KYC
   useEffect(() => {
-    if (!isClient) return;
-    if (!isConnecting && !isConnected) {
-      router.push("/");
-      return;
+    if (isClient && !profileLoading && !profile?.identity?.isKycVerified) {
+      router.push('/kyc');
     }
-  }, [isClient, isConnecting, isConnected, router]);
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
+
+  // No redirect logic - allow free navigation
 
   const handleTransferTicket = async () => {
     if (!selectedTicket || !transferRecipient || !address) return;
@@ -120,7 +120,6 @@ export default function DashboardPage() {
   if (!isClient || isConnecting) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
@@ -136,10 +135,9 @@ export default function DashboardPage() {
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-white">
-        <Navbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <p className="text-gray-500 font-medium">Redirecting...</p>
+            <p className="text-gray-500 font-medium">Please connect your wallet to view your dashboard.</p>
           </div>
         </div>
       </div>
@@ -148,8 +146,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <Navbar />
-
       <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
         {/* Grid Background */}
         <div
