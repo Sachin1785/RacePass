@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>RacePass Contract Tester</title>
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            background: #0a0a0c;
+            color: #fff;
+            padding: 40px;
+        }
+
+        .card {
+            background: #16161a;
+            border: 1px solid #333;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #a855f7;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #999;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: #000;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #a855f7;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+            border-bottom: 2px solid #000;
+        }
+
+        button:hover {
+            background: #9333ea;
+        }
+
+        button:active {
+            border-bottom: 0;
+            margin-top: 2px;
+        }
+
+        .result {
+            margin-top: 16px;
+            padding: 12px;
+            background: #000;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            display: none;
+            word-break: break-all;
+            color: #0f0;
+            border: 1px solid #222;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .error {
+            color: #ff4d4d;
+            border-color: #ff4d4d;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .full-width {
+            grid-column: span 2;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .badge {
+            background: #333;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-size: 12px;
+            color: #ccc;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <div>
+            <h1>🏎️ RacePass Contract Tester</h1>
+            <p style="color: #999;">Testing backend issuance and reputation logic on Monad Testnet.</p>
+        </div>
+        <div class="badge">Network: Monad Testnet</div>
+    </div>
+
+    <div class="grid">
+        <!-- IDENTITY -->
+        <div class="card">
+            <h2>1. Issue Identity SBT</h2>
+            <label>Receiver Wallet Address</label>
+            <input type="text" id="id-address" placeholder="0x...">
+            <label>Initial Reputation Score</label>
+            <input type="number" id="id-rep" value="100">
+            <button onclick="issueIdentity()">Issue Identity</button>
+            <div id="res-issue" class="result"></div>
+        </div>
+
+        <!-- REPUTATION -->
+        <div class="card">
+            <h2>2. Manage Reputation</h2>
+            <label>Token ID</label>
+            <input type="number" id="rep-id" placeholder="Enter ID (e.g. 1)">
+            <label>Points to Add/Deduct</label>
+            <input type="number" id="rep-amount" value="15">
+            <label>Reason for change</label>
+            <input type="text" id="rep-reason" value="Successful Event Completion">
+            <div style="display: flex; gap: 10px;">
+                <button onclick="updateRep('add')" style="background: #10b981;">Add +</button>
+                <button onclick="updateRep('deduct')" style="background: #ef4444;">Deduct -</button>
+            </div>
+            <div id="res-rep" class="result"></div>
+        </div>
+
+        <!-- EAS ATTESTATION -->
+        <div class="card">
+            <h2>3. Selective Reputation (EAS)</h2>
+            <p style="font-size: 13px; color: #999; margin-bottom: 12px; line-height: 1.4;">Issue an off-chain Ethereum
+                Attestation Service (EAS) credential. This gives the user cryptographic proof they attended, which they
+                can selectively reveal without showing their entire history.</p>
+            <label>Receiver Wallet Address</label>
+            <input type="text" id="eas-address" placeholder="0x...">
+            <label>Event Name</label>
+            <input type="text" id="eas-event" value="Monaco Grand Prix 2026">
+            <label>Reputation Bonus</label>
+            <input type="number" id="eas-rep" value="20">
+            <button onclick="requestAttestation()" style="background: #eab308;">Sign Off-Chain Attestation</button>
+            <div id="res-eas" class="result"></div>
+        </div>
+
+        <!-- EAS VERIFY -->
+        <div class="card">
+            <h2>4. Cryptographic Verifier</h2>
+            <p style="font-size: 13px; color: #999; margin-bottom: 12px; line-height: 1.4;">Paste any EAS JSON payload
+                here to verify its authenticity without checking any database. This is how selective disclosure works!
+            </p>
+            <label>Paste EAS JSON Payload</label>
+            <textarea id="verify-json"
+                style="width: 100%; height: 100px; background: #000; color: #0f0; border: 1px solid #444; border-radius: 6px; font-family: monospace; font-size: 10px; padding: 10px; margin-bottom: 16px; box-sizing: border-box;"></textarea>
+            <button onclick="verifyAttestation()" style="background: #06b6d4;">Verify Authenticity</button>
+            <div id="res-verify" class="result"></div>
+        </div>
+
+        <!-- TICKETS -->
+        <div class="card">
+            <h2>5. Mint NFT Ticket</h2>
+            <label>Receiver Wallet Address</label>
+            <input type="text" id="tk-address" placeholder="0x...">
+            <label>Min Reputation Required to Attend</label>
+            <input type="number" id="tk-minrep" value="50">
+            <button onclick="mintTicket()">Issue Access Ticket</button>
+            <div id="res-tk" class="result"></div>
+        </div>
+
+        <!-- STATUS -->
+        <div class="card">
+            <h2>6. Verify Token ID</h2>
+            <label>Identity Token ID</label>
+            <input type="number" id="chk-id" placeholder="e.g. 1">
+            <button onclick="checkId()" style="background: #3b82f6;">Fetch On-Chain Data</button>
+            <div id="res-chk" class="result"></div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="card full-width">
+            <h2>👤 Universal Identity Dashboard (DB + Chain)</h2>
+            <label>User Wallet Address</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="dash-address" placeholder="0x..." style="margin-bottom: 0;">
+                <button onclick="getUserDashboard()" style="width: auto; padding: 0 40px;">Load Profile</button>
+            </div>
+            <div id="res-dash" class="result"></div>
+        </div>
+    </div>
+
+    <script>
+        const API = 'http://localhost:3005/api';
+
+        async function post(path, body) {
+            const res = await fetch(`${API}${path}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            return await res.json();
+        }
+
+        function showResult(divId, data) {
+            const div = document.getElementById(divId);
+            div.style.display = 'block';
+            div.innerText = JSON.stringify(data, null, 2);
+            if (data.success === false) {
+                div.classList.add('error');
+            } else {
+                div.classList.remove('error');
+            }
+        }
+
+        async function issueIdentity() {
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '📡 Communicating with Monad...';
+            const res = await post('/identity/issue', {
+                address: document.getElementById('id-address').value,
+                initialReputation: document.getElementById('id-rep').value,
+                isOver18: true,
+                isKycVerified: true
+            });
+            showResult('res-issue', res);
+            btn.innerText = oldText;
+        }
+
+        async function updateRep(type) {
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '⚙️ Updating Chain...';
+            const res = await post('/identity/reputation', {
+                tokenId: document.getElementById('rep-id').value,
+                amount: document.getElementById('rep-amount').value,
+                reason: document.getElementById('rep-reason').value,
+                type: type
+            });
+            showResult('res-rep', res);
+            btn.innerText = oldText;
+        }
+
+        async function requestAttestation() {
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '✍️ Signing Attestation...';
+            const res = await post('/attest/issue', {
+                recipient: document.getElementById('eas-address').value,
+                eventName: document.getElementById('eas-event').value,
+                reputationValue: document.getElementById('eas-rep').value
+            });
+            showResult('res-eas', res);
+
+            // Auto-fill the verifier for easier testing
+            if (res.success) {
+                document.getElementById('verify-json').value = JSON.stringify(res.attestation, null, 2);
+            }
+            btn.innerText = oldText;
+        }
+
+        async function verifyAttestation() {
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '🛡️ Verifying Signature...';
+            try {
+                const json = JSON.parse(document.getElementById('verify-json').value);
+                const res = await post('/attest/verify', { attestation: json });
+                showResult('res-verify', res);
+            } catch (e) {
+                showResult('res-verify', { success: false, error: "Invalid JSON format" });
+            }
+            btn.innerText = oldText;
+        }
+
+        async function mintTicket() {
+            const btn = event.target; const oldText = btn.innerText; btn.innerText = '🎟️ Minting Pass...';
+            const res = await post('/tickets/mint', {
+                to: document.getElementById('tk-address').value,
+                minReputation: document.getElementById('tk-minrep').value
+            });
+            showResult('res-tk', res);
+            btn.innerText = oldText;
+        }
+
+        async function checkId() {
+            const id = document.getElementById('chk-id').value;
+            const res = await fetch(`${API}/identity/${id}`).then(r => r.json());
+            showResult('res-chk', res);
+        }
+
+        async function getUserDashboard() {
+            const addr = document.getElementById('dash-address').value;
+            if (!addr) return alert("Please enter a wallet address");
+            const res = await fetch(`${API}/user/${addr}`).then(r => r.json());
+            showResult('res-dash', res);
+        }
+    </script>
+</body>
+
+</html>
