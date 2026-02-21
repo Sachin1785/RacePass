@@ -15,6 +15,7 @@ contract RacePassIdentity is ERC721, Ownable {
         bool isOver18;
         uint256 baseReputationScore;
         uint256 lastUpdateTimestamp;
+        bool isRevoked;
     }
 
     uint256 private _nextTokenId;
@@ -34,6 +35,7 @@ contract RacePassIdentity is ERC721, Ownable {
     error AlreadyHasIdentity();
     error NotTrustedVerifier();
     error SoulboundTokenCannotBeTransferred();
+    error IdentityRevoked();
 
     event IdentityIssued(address indexed user, uint256 tokenId);
     event ReputationUpdated(uint256 indexed tokenId, uint256 newScore, string reason);
@@ -70,7 +72,8 @@ contract RacePassIdentity is ERC721, Ownable {
             isKycVerified: isKycVerified,
             isOver18: isOver18,
             baseReputationScore: initialReputation,
-            lastUpdateTimestamp: block.timestamp
+            lastUpdateTimestamp: block.timestamp,
+            isRevoked: false
         });
 
         emit IdentityIssued(to, tokenId);
@@ -105,6 +108,10 @@ contract RacePassIdentity is ERC721, Ownable {
         emit ReputationUpdated(tokenId, newScore, reason);
     }
 
+    function revokeIdentity(uint256 tokenId, bool status) external onlyOwner {
+        identityData[tokenId].isRevoked = status;
+    }
+
     /**
      * @dev Calculates current reputation factoring in time decay (Tire Wear).
      */
@@ -131,6 +138,7 @@ contract RacePassIdentity is ERC721, Ownable {
         if (tokenId == 0) return false;
         
         IdentityAttributes memory attrs = identityData[tokenId];
+        if (attrs.isRevoked) return false;
         
         if (requireAge18 && !attrs.isOver18) return false;
         if (getActiveReputation(tokenId) < minReputation) return false;

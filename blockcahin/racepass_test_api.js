@@ -12,7 +12,7 @@ BigInt.prototype.toJSON = function () { return this.toString(); };
 let db;
 (async () => {
     db = await open({
-        filename: "./racepass.db",
+        filename: "./racepass_v4.db",
         driver: sqlite3.Database
     });
     await db.exec(`
@@ -23,6 +23,7 @@ let db;
         );
         CREATE TABLE IF NOT EXISTS tickets (
             ticket_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            on_chain_id TEXT,
             owner_address TEXT,
             tx_hash TEXT,
             minted_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -59,8 +60,8 @@ app.use(express.json());
 // CONFIG
 const RPC_URL = process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz";
 const PRIVATE_KEY = process.env.MONAD_PRIVATE_KEY;
-const IDENTITY_ADDRESS = "0xF6B60D212abd955a6d4937535f89B5B7b6426C47";
-const TICKET_ADDRESS = "0xeb52e2394ECFbAbFD53F9cF9e50F8c4bC35d84e2";
+const IDENTITY_ADDRESS = "0x97d59a00FdfBea72C9D95d2C43AdAa1938608d5f";
+const TICKET_ADDRESS = "0xb3BA57B6FEDb83030244e1fe6DB832dfC77B1c57";
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
 const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
@@ -83,47 +84,52 @@ const schemaUID = "0x12345678123456781234567812345678123456781234567812345678123
 
 // --- EAS ATTESTATION ENDPOINT ---
 
+// Helper to issue EAS attestation
+async function issueAttestationHelper(recipient, eventName, reputationValue) {
+    console.log(`Issuing EAS Offchain Attestation to ${recipient} for ${eventName}`);
+
+    const encodedData = schemaEncoder.encodeData([
+        { name: "eventName", value: eventName, type: "string" },
+        { name: "reputationValue", value: reputationValue, type: "uint256" }
+    ]);
+
+    const attestation = await offchain.signOffchainAttestation(
+        {
+            recipient: recipient,
+            expirationTime: 0n,
+            time: BigInt(Math.floor(Date.now() / 1000)),
+            revocable: true,
+            schema: schemaUID,
+            refUID: '0x0000000000000000000000000000000000000000000000000000000000000000',
+            data: encodedData
+        },
+        wallet
+    );
+
+    const signatureStr = JSON.stringify(attestation);
+
+    await db.run(
+        'INSERT INTO attestations (uid, recipient, event_name, reputation_value, signature_data) VALUES (?, ?, ?, ?, ?)',
+        [attestation.uid, recipient.toLowerCase(), eventName, reputationValue, signatureStr]
+    );
+
+    const user = await db.get('SELECT token_id FROM users WHERE address = ?', [recipient.toLowerCase()]);
+    if (user && user.token_id) {
+        console.log(`Auto-adding ${reputationValue} core reputation to Token ID ${user.token_id}...`);
+        try {
+            const tx = await identityContract.addReputation(user.token_id, reputationValue, "Attestation: " + eventName);
+            await tx.wait();
+        } catch (e) {
+            console.warn("Reputation update skipped (likely insufficient balance or network issue):", e.message);
+        }
+    }
+    return attestation;
+}
+
 app.post("/api/attest/issue", async (req, res) => {
     try {
         const { recipient, eventName, reputationValue } = req.body;
-        console.log(`Issuing EAS Offchain Attestation to ${recipient} for ${eventName}`);
-
-        // Encode the data
-        const encodedData = schemaEncoder.encodeData([
-            { name: "eventName", value: eventName, type: "string" },
-            { name: "reputationValue", value: reputationValue, type: "uint256" }
-        ]);
-
-        // Sign the attestation with the backend wallet
-        const attestation = await offchain.signOffchainAttestation(
-            {
-                recipient: recipient,
-                expirationTime: 0n, // never expires
-                time: BigInt(Math.floor(Date.now() / 1000)),
-                revocable: true,
-                schema: schemaUID,
-                refUID: '0x0000000000000000000000000000000000000000000000000000000000000000',
-                data: encodedData
-            },
-            wallet
-        );
-
-        // attestation.uid, .signature, .message -> serialize for db
-        const signatureStr = JSON.stringify(attestation);
-
-        await db.run(
-            'INSERT INTO attestations (uid, recipient, event_name, reputation_value, signature_data) VALUES (?, ?, ?, ?, ?)',
-            [attestation.uid, recipient.toLowerCase(), eventName, reputationValue, signatureStr]
-        );
-
-        // Automatically add it to their global reputation too so we track both!
-        const user = await db.get('SELECT token_id FROM users WHERE address = ?', [recipient.toLowerCase()]);
-        if (user && user.token_id) {
-            console.log(`Auto-adding ${reputationValue} core reputation to Token ID ${user.token_id}...`);
-            const tx = await identityContract.addReputation(user.token_id, reputationValue, "Attestation: " + eventName);
-            await tx.wait();
-        }
-
+        const attestation = await issueAttestationHelper(recipient, eventName, reputationValue);
         res.json({ success: true, uid: attestation.uid, attestation });
     } catch (error) {
         console.error("EAS Error:", error);
@@ -279,24 +285,136 @@ app.get("/api/identity/:tokenId", async (req, res) => {
 // Mint programmatic ticket
 app.post("/api/tickets/mint", async (req, res) => {
     try {
-        const { to, requireAge18, minReputation, maxResalePrice } = req.body;
-        console.log(`Minting ticket for ${to}...`);
+        const { to, eventName, requireAge18, minReputation, maxResalePrice } = req.body;
+        console.log(`Minting ticket for ${eventName} to ${to}...`);
 
         const tx = await ticketContract.issueTicket(
             to,
+            eventName || "General Access",
             requireAge18 || false,
             minReputation || 0,
             ethers.parseEther(maxResalePrice || "0.1")
         );
         const receipt = await tx.wait();
 
+        // Extract Token ID from events
+        // Note: The event name depends on the contract, usually 'TicketIssued' or 'Transfer'
+        const event = receipt.logs.find(log => log.fragment && log.fragment.name === 'TicketIssued');
+        const onChainId = event ? event.args[1].toString() : "Unknown";
+
         // Store ticket in DB
         await db.run(
-            'INSERT INTO tickets (owner_address, tx_hash) VALUES (?, ?)',
-            [to.toLowerCase(), receipt.hash]
+            'INSERT INTO tickets (on_chain_id, owner_address, tx_hash) VALUES (?, ?, ?)',
+            [onChainId, to.toLowerCase(), receipt.hash]
         );
 
+        res.json({ success: true, txHash: receipt.hash, onChainId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Revoke Identity
+app.post("/api/identity/revoke", async (req, res) => {
+    try {
+        const { tokenId, status } = req.body; // status: true to revoke, false to restore
+        console.log(`Setting revocation status to ${status} for token ${tokenId}...`);
+
+        const tx = await identityContract.revokeIdentity(tokenId, status);
+        const receipt = await tx.wait();
+
         res.json({ success: true, txHash: receipt.hash });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Ticket Check-in (Manual by Token ID)
+app.post("/api/tickets/check-in", async (req, res) => {
+    try {
+        const { tokenId, eventName, reputationValue } = req.body;
+        const rep = parseInt(reputationValue) || 50;
+        console.log(`Checking in ticket ${tokenId} for event ${eventName}...`);
+
+        const tx = await ticketContract.checkIn(tokenId, eventName);
+        const receipt = await tx.wait();
+
+        // New: Auto-issue EAS attestation on check-in
+        const owner = await ticketContract.ownerOf(tokenId);
+        const attestation = await issueAttestationHelper(owner, eventName, rep);
+
+        res.json({
+            success: true,
+            txHash: receipt.hash,
+            attestationUid: attestation.uid,
+            message: `Check-in successful! Attestation issued to ${owner}`
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Magic Check-in (Automatic by Wallet Address)
+// Finds the first valid ticket for the event owned by this address
+app.post("/api/tickets/check-in-by-address", async (req, res) => {
+    try {
+        const { address, eventName } = req.body;
+        const normalizedAddress = address.toLowerCase();
+        console.log(`Scanning for ${eventName} tickets owned by ${normalizedAddress}...`);
+
+        // 1. Get all tickets for this address from our DB
+        const userTickets = await db.all('SELECT on_chain_id FROM tickets WHERE owner_address = ?', [normalizedAddress]);
+
+        if (!userTickets || userTickets.length === 0) {
+            return res.status(404).json({ success: false, error: "No tickets found for this address in our records." });
+        }
+
+        // 2. iterate through them to find one that is NOT checked in and matches the event
+        let targetTokenId = null;
+
+        for (const t of userTickets) {
+            if (t.on_chain_id === "Unknown") continue;
+
+            try {
+                const isUsed = await ticketContract.checkedIn(t.on_chain_id);
+                if (!isUsed) {
+                    const details = await ticketContract.ticketDetails(t.on_chain_id);
+                    if (details.eventName === eventName) {
+                        targetTokenId = t.on_chain_id;
+                        break; // Found it!
+                    }
+                }
+            } catch (e) {
+                console.warn(`Skipping ticket ${t.on_chain_id} due to error:`, e.message);
+            }
+        }
+
+        if (!targetTokenId) {
+            return res.status(400).json({ success: false, error: `No valid, unused tickets found for "${eventName}" at this address.` });
+        }
+
+        // 3. Perform the check-in
+        const { reputationValue } = req.body;
+        const rep = parseInt(reputationValue) || 50;
+
+        console.log(`Auto-checking in Ticket ID: ${targetTokenId}`);
+        const tx = await ticketContract.checkIn(targetTokenId, eventName);
+        const receipt = await tx.wait();
+
+        // New: Auto-issue EAS attestation on check-in
+        const attestation = await issueAttestationHelper(normalizedAddress, eventName, rep);
+
+        res.json({
+            success: true,
+            message: `Success! Checked in ticket #${targetTokenId} and issued reputation credential.`,
+            tokenId: targetTokenId,
+            attestationUid: attestation.uid,
+            txHash: receipt.hash
+        });
+
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: error.message });
@@ -325,6 +443,7 @@ app.get("/api/user/:address", async (req, res) => {
                 baseReputation: data.baseReputationScore.toString(),
                 isOver18: data.isOver18,
                 isKycVerified: data.isKycVerified,
+                isRevoked: data.isRevoked,
                 lastUpdate: new Date(Number(data.lastUpdateTimestamp) * 1000).toLocaleString()
             };
 
@@ -333,7 +452,28 @@ app.get("/api/user/:address", async (req, res) => {
         }
 
         // 4. Get Tickets
-        const tickets = await db.all('SELECT * FROM tickets WHERE owner_address = ? ORDER BY minted_at DESC', [address]);
+        const rawTickets = await db.all('SELECT * FROM tickets WHERE owner_address = ? ORDER BY minted_at DESC', [address]);
+        const tickets = await Promise.all(rawTickets.map(async (t) => {
+            let isCheckedIn = false;
+            let eventName = "Unknown Event";
+            if (t.on_chain_id && t.on_chain_id !== "Unknown") {
+                try {
+                    isCheckedIn = await ticketContract.checkedIn(t.on_chain_id);
+                    const details = await ticketContract.ticketDetails(t.on_chain_id);
+                    eventName = details.eventName;
+                } catch (e) {
+                    console.error("Error fetching ticket details:", e);
+                }
+            }
+            return {
+                dbId: t.ticket_id,
+                onChainId: t.on_chain_id,
+                txHash: t.tx_hash,
+                mintedAt: t.minted_at,
+                isCheckedIn: isCheckedIn,
+                eventName: eventName
+            };
+        }));
 
         // 5. Get EAS Attestations
         const attestations = await db.all('SELECT uid, event_name, reputation_value, created_at, signature_data FROM attestations WHERE recipient = ? ORDER BY created_at DESC', [address]);
