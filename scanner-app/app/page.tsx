@@ -1,19 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PageId, RaceEvent, ScanHistoryEntry } from '@/lib/types';
+import { PageId, RaceEvent } from '@/lib/types';
 import { checkAPIHealth, loadEvents } from '@/lib/api';
 import BottomNav from '@/components/BottomNav';
 import ScanPage from '@/components/ScanPage';
 import EventsPage from '@/components/EventsPage';
-import HistoryPage from '@/components/HistoryPage';
 import Toast from '@/components/Toast';
 
 export default function Home() {
   const [page, setPage] = useState<PageId>('scan');
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const [events, setEvents] = useState<RaceEvent[]>([]);
-  const [history, setHistory] = useState<ScanHistoryEntry[]>([]);
   const [toast, setToast] = useState({ message: '', visible: false });
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,87 +42,73 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [pingAPI, fetchEvents]);
 
-  function addHistory(entry: Omit<ScanHistoryEntry, 'id' | 'time'>) {
-    setHistory((prev) => [
-      { ...entry, id: Date.now().toString(), time: new Date() },
-      ...prev.slice(0, 49),
-    ]);
-  }
+  const statusColor =
+    apiOnline === null ? 'var(--amber)' : apiOnline ? 'var(--green)' : 'var(--red)';
+  const statusLabel =
+    apiOnline === null ? 'Connecting' : apiOnline ? 'Online' : 'Offline';
 
   return (
     <>
-      {/* Background orbs */}
-      <div style={{
-        position: 'fixed', borderRadius: '50%', pointerEvents: 'none', zIndex: 0,
-        filter: 'blur(80px)', opacity: 0.18,
-        width: 340, height: 340, top: -80, left: -80,
-        background: 'radial-gradient(circle, #7c3aed, transparent)',
-      }} />
-      <div style={{
-        position: 'fixed', borderRadius: '50%', pointerEvents: 'none', zIndex: 0,
-        filter: 'blur(80px)', opacity: 0.18,
-        width: 260, height: 260, bottom: 120, right: -60,
-        background: 'radial-gradient(circle, #06b6d4, transparent)',
-      }} />
-
       {/* App shell */}
       <div style={{
-        position: 'relative', zIndex: 1,
         display: 'flex', flexDirection: 'column',
         height: '100dvh', overflow: 'hidden',
+        background: 'var(--background)',
       }}>
-        {/* Header */}
+
+        {/* ── Header ── */}
         <header style={{
-          flexShrink: 0, padding: '16px 20px 12px',
-          background: 'linear-gradient(180deg, rgba(10,10,15,0.95) 0%, transparent 100%)',
+          flexShrink: 0,
+          padding: '12px 20px 10px',
+          background: 'var(--background)',
+          borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
+          {/* Logo + wordmark */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
-              width: 36, height: 36, borderRadius: 10,
-              background: 'linear-gradient(135deg, var(--accent), var(--teal))',
+              width: 34, height: 34, borderRadius: 9,
+              background: 'var(--accent)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, boxShadow: '0 0 20px rgba(124,58,237,0.4)',
-            }}>🏎️</div>
-            <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.3px' }}>
-              Race<span style={{ color: 'var(--accent2)' }}>Pass</span>
+              boxShadow: '0 2px 10px rgba(245,197,24,0.35)',
+            }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.5px', color: 'var(--foreground)' }}>
+              Race<span style={{ color: 'var(--accent-dark)' }}>Pass</span>
             </div>
           </div>
 
-          {/* API status */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
+          {/* API status pill */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 11px', borderRadius: 20,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            fontSize: 11, color: 'var(--muted)',
+            fontWeight: 500,
+          }}>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: apiOnline === null ? 'var(--amber)' : apiOnline ? 'var(--green)' : 'var(--red)',
-              boxShadow: `0 0 8px ${apiOnline === null ? 'var(--amber)' : apiOnline ? 'var(--green)' : 'var(--red)'}`,
+              width: 6, height: 6, borderRadius: '50%',
+              background: statusColor,
+              boxShadow: `0 0 5px ${statusColor}`,
             }} className="animate-pulse-dot" />
-            {apiOnline === null ? 'Connecting…' : apiOnline ? 'API Online' : 'API Offline'}
+            {statusLabel}
           </div>
         </header>
 
-        {/* Main scrollable area */}
+        {/* ── Main ── */}
         <main style={{
           flex: 1,
           overflowY: 'auto', overflowX: 'hidden',
           paddingBottom: 'calc(var(--nav-h) + var(--safe-bottom) + 8px)',
+          background: 'var(--surface)',
         }}>
-          {page === 'scan' && (
-            <ScanPage
-              events={events}
-              onToast={showToast}
-              onScanLogged={addHistory}
-            />
-          )}
-          {page === 'events' && (
-            <EventsPage
-              events={events}
-              onRefresh={fetchEvents}
-              onToast={showToast}
-            />
-          )}
-          {page === 'history' && (
-            <HistoryPage history={history} />
-          )}
+          {page === 'scan' && <ScanPage events={events} onToast={showToast} />}
+          {page === 'events' && <EventsPage events={events} onRefresh={fetchEvents} onToast={showToast} />}
         </main>
 
         <BottomNav active={page} onChange={setPage} />

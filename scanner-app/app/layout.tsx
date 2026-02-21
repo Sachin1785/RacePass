@@ -33,8 +33,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: [
-    { media: '(prefers-color-scheme: dark)', color: '#0a0a0f' },
-    { media: '(prefers-color-scheme: light)', color: '#0a0a0f' },
+    { media: '(prefers-color-scheme: dark)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
   ],
   viewportFit: 'cover',
   interactiveWidget: 'resizes-visual',
@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* Prevent phone number formatting */}
         <meta name="format-detection" content="telephone=no" />
       </head>
-      <body style={{ margin: 0, background: '#0a0a0f', overscrollBehavior: 'none' }}>
+      <body style={{ margin: 0, background: '#ffffff', overscrollBehavior: 'none' }}>
         {children}
         <InstallBanner />
         <PWARegister />

@@ -1,4 +1,9 @@
-export const API = 'https://unremarked-zonally-harold.ngrok-free.dev';
+// Base URL: set NEXT_PUBLIC_API_URL in .env.local to override the default ngrok address.
+// Example .env.local:
+//   NEXT_PUBLIC_API_URL=https://your-new-url.ngrok-free.app
+export const API =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ||
+    'https://unremarked-zonally-harold.ngrok-free.dev';
 
 export const NGROK_HEADERS: Record<string, string> = {
     'ngrok-skip-browser-warning': 'true',

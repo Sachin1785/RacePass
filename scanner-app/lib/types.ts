@@ -30,14 +30,4 @@ export interface Attendee {
     minted_at: string;
 }
 
-export interface ScanHistoryEntry {
-    id: string;
-    address: string;
-    eventName: string;
-    success: boolean;
-    error?: string;
-    txHash?: string;
-    time: Date;
-}
-
-export type PageId = 'scan' | 'events' | 'history';
+export type PageId = 'scan' | 'events';
