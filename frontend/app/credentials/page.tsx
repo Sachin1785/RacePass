@@ -1,471 +1,357 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
 interface Attestation {
-  uid: string;
-  eventName: string;
-  reputationValue: number;
-  issuedAt: string;
-  payload: any;
+    uid: string;
+    eventName: string;
+    reputationValue: number;
+    issuedAt: string;
+    payload: any;
 }
 
+// ─── Animation Helpers ────────────────────────────────────────────────────────
+const fadeUp = (delay = 0) => ({
+    initial: { opacity: 0, y: 28 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as any, delay },
+});
+
+const fadeIn = (delay = 0) => ({
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    transition: { duration: 0.6, delay },
+});
+
 export default function CredentialsPage() {
-  const { address, isConnected } = useAccount();
-  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
-  const [selectedAttestation, setSelectedAttestation] = useState<Attestation | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationResult, setVerificationResult] = useState<any>(null);
-  
-  // Presentation builder state
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedCredentials, setSelectedCredentials] = useState<Set<string>>(new Set());
-  const [showPresentationModal, setShowPresentationModal] = useState(false);
+    const { address, isConnected } = useAccount();
+    const { data: profile, isLoading: profileLoading } = useRacePassProfile();
+    const [selectedAttestation, setSelectedAttestation] = useState<Attestation | null>(null);
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [verificationResult, setVerificationResult] = useState<any>(null);
+    const [isClient, setIsClient] = useState(false);
+    const router = useRouter();
 
-  const handleVerifyAttestation = async (attestation: Attestation) => {
-    setIsVerifying(true);
-    setVerificationResult(null);
-    setSelectedAttestation(attestation);
+    // Presentation builder state
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/api/attest/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attestation: attestation.payload })
-      });
+    // Wait for client-side hydration
+    useEffect(() => {
+        const timer = setTimeout(() => setIsClient(true), 0);
+        return () => clearTimeout(timer);
+    }, []);
 
-      const data = await response.json();
-      setVerificationResult(data);
-    } catch (error) {
-      setVerificationResult({
-        success: false,
-        error: 'Failed to verify attestation'
-      });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
+    // Redirect unverified users to KYC
+    useEffect(() => {
+        if (isClient && !profileLoading && !profile?.identity?.isKycVerified) {
+            router.push('/kyc');
+        }
+    }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
+    const [selectedCredentials, setSelectedCredentials] = useState<Set<string>>(new Set());
+    const [showPresentationModal, setShowPresentationModal] = useState(false);
 
-  const handleCopyAttestation = (attestation: Attestation) => {
-    const attestationData = JSON.stringify(attestation.payload, null, 2);
-    navigator.clipboard.writeText(attestationData);
-    alert('Attestation copied to clipboard! You can now share this with third parties for verification.');
-  };
+    const attestations = (profile?.verifiableAttestations || []) as Attestation[];
 
-  const toggleCredentialSelection = (uid: string) => {
-    const newSelection = new Set(selectedCredentials);
-    if (newSelection.has(uid)) {
-      newSelection.delete(uid);
-    } else {
-      newSelection.add(uid);
-    }
-    setSelectedCredentials(newSelection);
-  };
+    const handleVerifyAttestation = async (attestation: Attestation) => {
+        setIsVerifying(true);
+        setVerificationResult(null);
+        setSelectedAttestation(attestation);
 
-  const handleCreatePresentation = () => {
-    if (selectedCredentials.size === 0) {
-      alert('Please select at least one credential to create a presentation');
-      return;
-    }
-    setShowPresentationModal(true);
-  };
-
-  const handleCopyPresentation = () => {
-    const selectedAttestations = attestations.filter(a => selectedCredentials.has(a.uid));
-    const presentation = {
-      version: '1.0',
-      issuer: 'RacePass Platform',
-      issuedAt: new Date().toISOString(),
-      holder: address,
-      credentials: selectedAttestations.map(a => ({
-        uid: a.uid,
-        eventName: a.eventName,
-        reputationValue: a.reputationValue,
-        issuedAt: a.issuedAt,
-        payload: a.payload
-      }))
+        try {
+            const response = await fetch(`${BACKEND_URL}/api/attest/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attestation: attestation.payload })
+            });
+            const data = await response.json();
+            setVerificationResult(data);
+        } catch (error) {
+            setVerificationResult({ success: false, error: 'Failed to verify attestation' });
+        } finally {
+            setIsVerifying(false);
+        }
     };
-    
-    navigator.clipboard.writeText(JSON.stringify(presentation, null, 2));
-    alert(`Presentation with ${selectedCredentials.size} credential(s) copied to clipboard! Share this with third parties for verification.`);
-    setShowPresentationModal(false);
-    setIsSelectionMode(false);
-    setSelectedCredentials(new Set());
-  };
 
-  if (!isConnected) {
+    const handleCopyAttestation = (attestation: Attestation) => {
+        const attestationData = JSON.stringify(attestation.payload, null, 2);
+        navigator.clipboard.writeText(attestationData);
+        alert('Attestation copied to clipboard! You can share this for off-chain verification.');
+    };
+
+    const toggleCredentialSelection = (uid: string) => {
+        const newSelection = new Set(selectedCredentials);
+        if (newSelection.has(uid)) { newSelection.delete(uid); } else { newSelection.add(uid); }
+        setSelectedCredentials(newSelection);
+    };
+
+    const handleCreatePresentation = () => {
+        if (selectedCredentials.size === 0) {
+            alert('Please select at least one credential');
+            return;
+        }
+        setShowPresentationModal(true);
+    };
+
+    const handleCopyPresentation = () => {
+        const selectedAttestations = attestations.filter(a => selectedCredentials.has(a.uid));
+        const presentation = {
+            version: '1.0',
+            issuer: 'RacePass Platform',
+            issuedAt: new Date().toISOString(),
+            holder: address,
+            credentials: selectedAttestations.map(a => ({
+                uid: a.uid,
+                eventName: a.eventName,
+                reputationValue: a.reputationValue,
+                issuedAt: a.issuedAt,
+                payload: a.payload
+            }))
+        };
+        navigator.clipboard.writeText(JSON.stringify(presentation, null, 2));
+        alert('Presentation bundle copied to clipboard!');
+        setShowPresentationModal(false);
+        setIsSelectionMode(false);
+        setSelectedCredentials(new Set());
+    };
+
     return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="flex items-center justify-center py-24">
-          <div className="text-center">
-            <div className="text-6xl mb-4">🔌</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Wallet Not Connected</h2>
-            <p className="text-gray-600 mb-6">Please connect your wallet to view your credentials</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (profileLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <Navbar />
-        <div className="flex items-center justify-center py-24">
-          <div className="text-gray-500">Loading credentials...</div>
-        </div>
-      </div>
-    );
-  }
-
-  const attestations = profile?.verifiableAttestations || [];
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">🎫 Credentials Wallet</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Your verifiable off-chain attestations for privacy-preserving proofs
-          </p>
-        </div>
-
-        {/* Info Banner */}
-        <div className="mb-8 bg-purple-50 rounded-xl border border-purple-200 p-6">
-          <div className="flex">
-            <div className="shrink-0">
-              <svg
-                className="h-6 w-6 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-purple-800">What are Credentials?</h3>
-              <p className="mt-1 text-sm text-purple-700">
-                These are cryptographically signed proofs of your event attendance, issued using the Ethereum Attestation Service (EAS). 
-                You can share these with third parties to prove you attended specific events without revealing your entire transaction history.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Presentation Builder Controls */}
-        {attestations.length > 0 && (
-          <div className="mb-6 flex items-center justify-between bg-white rounded-lg shadow-sm p-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">
-                {isSelectionMode ? `${selectedCredentials.size} credential(s) selected` : 'Presentation Builder'}
-              </h3>
-              <p className="text-xs text-gray-600">
-                {isSelectionMode ? 'Select credentials to bundle into a verifiable presentation' : 'Bundle multiple credentials for high-value verifications'}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              {isSelectionMode ? (
-                <>
-                  <button
-                    onClick={() => {
-                      setIsSelectionMode(false);
-                      setSelectedCredentials(new Set());
+        <div className="min-h-screen bg-white font-sans text-gray-900">
+            <main className="relative overflow-hidden bg-white min-h-[calc(100vh-64px)] pb-20">
+                {/* Grid Background */}
+                <div
+                    className="pointer-events-none absolute inset-0 opacity-30"
+                    style={{
+                        backgroundImage: "radial-gradient(circle at 1px 1px, #f5c51833 1px, transparent 0)",
+                        backgroundSize: "32px 32px",
                     }}
-                    className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreatePresentation}
-                    disabled={selectedCredentials.size === 0}
-                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
-                      selectedCredentials.size === 0
-                        ? 'bg-gray-300 cursor-not-allowed'
-                        : 'bg-green-600 hover:bg-green-500'
-                    }`}
-                  >
-                    Create Presentation ({selectedCredentials.size})
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/verify"
-                    className="rounded-lg bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-200"
-                  >
-                    🔍 Verify Credentials
-                  </Link>
-                  <button
-                    onClick={() => setIsSelectionMode(true)}
-                    className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
-                  >
-                    📦 Build Presentation
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+                />
+                {/* Yellow Glow Blobs */}
 
-        {/* Credentials Grid */}
-        {attestations.length === 0 ? (
-          <div className="text-center py-24 bg-white rounded-xl shadow-sm">
-            <div className="text-6xl mb-4">📋</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">No Credentials Yet</h2>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Credentials are automatically issued when you check in at events. 
-              Attend events to start collecting verifiable attestations!
-            </p>
-            <Link
-              href="/events"
-              className="inline-flex items-center rounded-full bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500"
-            >
-              Browse Events
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {attestations.map((attestation) => (
-              <div
-                key={attestation.uid}
-                className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden relative ${
-                  isSelectionMode && selectedCredentials.has(attestation.uid) ? 'ring-2 ring-purple-600' : ''
-                }`}
-              >
-                {/* Selection Checkbox */}
-                {isSelectionMode && (
-                  <div className="absolute top-4 right-4 z-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedCredentials.has(attestation.uid)}
-                      onChange={() => toggleCredentialSelection(attestation.uid)}
-                      className="h-5 w-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                    />
-                  </div>
-                )}
 
-                {/* Card Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
-                  <div className="text-3xl mb-2">🎟️</div>
-                  <h3 className="text-lg font-semibold">{attestation.eventName}</h3>
-                  <div className="mt-2 text-sm opacity-90">
-                    +{attestation.reputationValue} Reputation
-                  </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="p-6">
-                  <dl className="space-y-3">
-                    <div>
-                      <dt className="text-xs text-gray-500">Attestation ID</dt>
-                      <dd className="text-sm font-mono text-gray-900 break-all">
-                        {attestation.uid.slice(0, 16)}...{attestation.uid.slice(-8)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-xs text-gray-500">Issued At</dt>
-                      <dd className="text-sm text-gray-900">
-                        {new Date(attestation.issuedAt).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </dd>
-                    </div>
-                  </dl>
-
-                  {/* Actions */}
-                  {!isSelectionMode && (
-                    <div className="mt-6 flex gap-2">
-                      <button
-                        onClick={() => handleVerifyAttestation(attestation)}
-                        className="flex-1 rounded-lg bg-purple-100 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-200"
-                      >
-                        Verify
-                      </button>
-                      <button
-                        onClick={() => handleCopyAttestation(attestation)}
-                        className="flex-1 rounded-lg bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-200"
-                      >
-                        Share
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Verification Modal */}
-        {selectedAttestation && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Attestation Details</h2>
-                <button
-                  onClick={() => {
-                    setSelectedAttestation(null);
-                    setVerificationResult(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Event</h3>
-                  <div className="text-lg font-semibold text-gray-900">{selectedAttestation.eventName}</div>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Attestation UID</h3>
-                  <code className="text-xs bg-gray-100 p-3 rounded-lg block break-all">
-                    {selectedAttestation.uid}
-                  </code>
-                </div>
-
-                {isVerifying && (
-                  <div className="text-center py-6">
-                    <div className="text-gray-500">Verifying attestation signature...</div>
-                  </div>
-                )}
-
-                {verificationResult && (
-                  <div className={`rounded-lg p-4 ${
-                    verificationResult.success
-                      ? 'bg-green-50 border border-green-200'
-                      : 'bg-red-50 border border-red-200'
-                  }`}>
-                    <div className={`text-sm font-medium ${
-                      verificationResult.success ? 'text-green-800' : 'text-red-800'
-                    }`}>
-                      {verificationResult.success ? '✅ Attestation Verified!' : '❌ Verification Failed'}
-                    </div>
-                    <div className={`mt-2 text-sm ${
-                      verificationResult.success ? 'text-green-700' : 'text-red-700'
-                    }`}>
-                      {verificationResult.message || verificationResult.error}
-                    </div>
-                    {verificationResult.success && verificationResult.issuer && (
-                      <div className="mt-3 pt-3 border-t border-green-200">
-                        <div className="text-xs text-green-600">
-                          <div><strong>Issuer:</strong> {verificationResult.issuer}</div>
-                          <div><strong>Recipient:</strong> {verificationResult.recipient}</div>
+                <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+                    {/* Header */}
+                    <motion.div {...fadeUp(0)} className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+                        <div>
+                            <motion.div {...fadeIn(0.1)} className="inline-flex items-center gap-2 rounded-full border border-yellow-400/50 bg-yellow-50 px-3 py-1 mb-3">
+                                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                                <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">
+                                    Attestation Wallet
+                                </span>
+                            </motion.div>
+                            <h1 className="text-4xl font-black text-gray-900 tracking-tight">Verifiable <span className="text-yellow-500 underline decoration-yellow-400/40 underline-offset-4">Credentials</span></h1>
+                            <p className="mt-2 text-gray-500 font-medium leading-relaxed max-w-xl">
+                                Manage your signed proofs of attendance and reputation. These are portable credentials you can share without exposing your wallet history.
+                            </p>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
 
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Raw Payload (JSON)</h3>
-                  <pre className="text-xs bg-gray-100 p-3 rounded-lg overflow-x-auto">
-                    {JSON.stringify(selectedAttestation.payload, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                        <div className="flex gap-3">
+                            {attestations.length > 0 && (
+                                <button
+                                    onClick={() => { setIsSelectionMode(!isSelectionMode); if (isSelectionMode) setSelectedCredentials(new Set()); }}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${isSelectionMode ? 'bg-yellow-100 text-yellow-700 shadow-inner' : 'bg-gray-100 text-gray-600 hover:bg-yellow-100 hover:text-yellow-700'
+                                        }`}
+                                >
+                                    {isSelectionMode ? 'Cancel Selection' : 'Build Presentation'}
+                                </button>
+                            )}
+                            {isSelectionMode && selectedCredentials.size > 0 && (
+                                <motion.button
+                                    initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                                    onClick={handleCreatePresentation}
+                                    className="px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest bg-yellow-400 text-black shadow-lg shadow-yellow-400/20 hover:bg-yellow-300 hover:scale-[1.02] transition-all"
+                                >
+                                    Bundle {selectedCredentials.size} Items
+                                </motion.button>
+                            )}
+                        </div>
+                    </motion.div>
 
-        {/* Presentation Modal */}
-        {showPresentationModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Verifiable Presentation</h2>
-                <button
-                  onClick={() => setShowPresentationModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+                    {/* Content Area */}
+                    {profileLoading ? (
+                        <div className="flex flex-col items-center justify-center py-20 bg-white/50 backdrop-blur-md rounded-[3rem] border border-yellow-100 shadow-xl shadow-yellow-900/5">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-yellow-500 mb-4"></div>
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading Digital Wallet...</p>
+                        </div>
+                    ) : attestations.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {attestations.map((att, idx) => (
+                                <motion.div
+                                    key={att.uid}
+                                    {...fadeUp(0.1 + idx * 0.05)}
+                                    onClick={() => isSelectionMode && toggleCredentialSelection(att.uid)}
+                                    className={`group relative overflow-hidden rounded-[2.5rem] p-8 border transition-all duration-300 ${isSelectionMode
+                                        ? (selectedCredentials.has(att.uid) ? 'bg-yellow-50 border-yellow-400 ring-2 ring-yellow-400/20 shadow-lg' : 'bg-white border-gray-100 opacity-60 grayscale cursor-pointer')
+                                        : 'bg-white border-yellow-50 hover:border-yellow-200 hover:shadow-xl hover:shadow-yellow-900/5 shadow-md shadow-yellow-900/5'
+                                        }`}
+                                >
+                                    {/* Card Decorative Edge */}
+                                    <div className="absolute top-1/2 -left-2 w-4 h-4 bg-white border border-transparent rounded-full -translate-y-1/2 shadow-inner" />
+                                    <div className="absolute top-1/2 -right-2 w-4 h-4 bg-white border border-transparent rounded-full -translate-y-1/2 shadow-inner" />
 
-              <div className="space-y-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-green-800 mb-2">✅ Presentation Ready</h3>
-                  <p className="text-sm text-green-700">
-                    You've bundled {selectedCredentials.size} credential(s) into a single verifiable presentation. 
-                    This allows you to prove multiple attributes in one shareable package.
-                  </p>
-                </div>
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="p-3 bg-yellow-50 text-yellow-600 rounded-2xl group-hover:scale-110 transition-transform duration-500">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                            </svg>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-gray-300 uppercase">Trust Value</p>
+                                            <p className="text-xl font-black text-yellow-500">+{att.reputationValue} REP</p>
+                                        </div>
+                                    </div>
 
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Included Credentials:</h3>
-                  <div className="space-y-2">
-                    {attestations
-                      .filter(a => selectedCredentials.has(a.uid))
-                      .map(att => (
-                        <div key={att.uid} className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-gray-900">{att.eventName}</p>
-                              <p className="text-xs text-gray-600">+{att.reputationValue} rep</p>
+                                    <div className="mb-8">
+                                        <h3 className="text-xl font-black text-gray-900 leading-tight mb-2 group-hover:text-yellow-600 transition-colors">{att.eventName}</h3>
+                                        <p className="text-xs font-mono text-gray-400 truncate tracking-tighter">UID: {att.uid}</p>
+                                    </div>
+
+                                    <div className="flex items-center justify-between mt-auto">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                            {new Date(att.issuedAt).toLocaleDateString()}
+                                        </span>
+                                        {!isSelectionMode && (
+                                            <div className="flex gap-2">
+                                                <button onClick={(e) => { e.stopPropagation(); handleVerifyAttestation(att); }} className="p-2 rounded-xl bg-yellow-50 text-yellow-600 hover:bg-yellow-100 active:scale-95 transition-all" title="Verify Proof">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                    </svg>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleCopyAttestation(att); }} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 active:scale-95 transition-all" title="Copy to Clipboard">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    ) : (
+                        <motion.div {...fadeIn(0.2)} className="text-center py-24 bg-yellow-50/30 rounded-[3.5rem] border-2 border-dashed border-yellow-200 shadow-inner">
+                            <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-yellow-100">
+                                <span className="text-4xl">📜</span>
                             </div>
-                            <span className="text-xs text-purple-700 font-mono">
-                              {att.uid.slice(0, 8)}...
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </div>
+                            <h3 className="text-2xl font-black text-gray-900 mb-2">Wallet is Empty</h3>
+                            <p className="text-gray-500 font-medium max-w-sm mx-auto mb-8">
+                                You haven't earned any verifiable credentials yet. Race clean and attend events to build your portable reputation.
+                            </p>
+                            <Link href="/events" className="inline-flex items-center gap-2 px-8 py-4 bg-yellow-400 text-black rounded-full font-black text-xs uppercase tracking-widest shadow-xl shadow-yellow-400/20 hover:bg-yellow-300 hover:scale-105 transition-all">
+                                Find Your First Event
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                </svg>
+                            </Link>
+                        </motion.div>
+                    )}
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-blue-800 mb-2">📋 How to Use</h3>
-                  <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-                    <li>Click "Copy Presentation" below</li>
-                    <li>Share the JSON with the verifying party</li>
-                    <li>They can verify it at the public verification portal</li>
-                    <li>All credentials are cryptographically signed and tamper-proof</li>
-                  </ol>
-                </div>
+                    {/* Verification Result Modal */}
+                    <AnimatePresence>
+                        {selectedAttestation && (
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+                            >
+                                <motion.div
+                                    initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+                                    className="bg-white rounded-[40px] max-w-lg w-full p-10 shadow-3xl relative border border-yellow-100 overflow-hidden"
+                                >
+                                    <button onClick={() => setSelectedAttestation(null)} className="absolute top-8 right-8 text-gray-400 hover:text-gray-900 transition-colors">
+                                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowPresentationModal(false)}
-                    className="flex-1 rounded-lg bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCopyPresentation}
-                    className="flex-1 rounded-lg bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:bg-green-500"
-                  >
-                    📋 Copy Presentation
-                  </button>
+                                    <h3 className="text-2xl font-black text-gray-900 mb-6">Credential <span className="text-yellow-500">Audit</span></h3>
+
+                                    <div className="space-y-6">
+                                        <div className="bg-yellow-50 p-6 rounded-3xl border border-yellow-100 shadow-inner">
+                                            <p className="text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-1">Authenticity Check</p>
+                                            {isVerifying ? (
+                                                <div className="flex items-center gap-3 py-2">
+                                                    <div className="w-4 h-4 rounded-full border-2 border-yellow-500 border-t-transparent animate-spin" />
+                                                    <span className="text-sm font-bold text-gray-500">Querying global attestation registry...</span>
+                                                </div>
+                                            ) : verificationResult?.success ? (
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3 text-green-600">
+                                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                        </svg>
+                                                        <span className="text-sm font-black uppercase tracking-widest">Valid Attestation</span>
+                                                    </div>
+                                                    <div className="bg-white/70 rounded-2xl p-4 text-[10px] font-mono text-gray-600 overflow-x-auto whitespace-pre border border-yellow-100">
+                                                        {JSON.stringify(verificationResult, null, 2)}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3 text-red-600">
+                                                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                    </svg>
+                                                    <span className="text-sm font-black uppercase tracking-widest text-red-500">Verification Failed</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button onClick={() => setSelectedAttestation(null)} className="w-full py-4 bg-gray-900 text-white rounded-full font-black text-xs uppercase tracking-widest hover:bg-black transition-colors shadow-xl shadow-gray-900/10">
+                                            Close Audit
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Presentation Builder Drawer */}
+                    <AnimatePresence>
+                        {showPresentationModal && (
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[100] bg-black/40 backdrop-blur-sm flex items-end justify-center p-0 md:p-4"
+                            >
+                                <motion.div
+                                    initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+                                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                                    className="bg-white rounded-t-[40px] md:rounded-[40px] max-w-lg w-full p-10 shadow-3xl border border-yellow-100 ring-4 ring-yellow-400/5"
+                                >
+                                    <div className="text-center">
+                                        <div className="w-20 h-2 bg-gray-100 rounded-full mx-auto mb-8 md:hidden" />
+                                        <div className="w-20 h-20 bg-yellow-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-inner border border-yellow-100">
+                                            <svg className="w-10 h-10 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                            </svg>
+                                        </div>
+                                        <h3 className="text-2xl font-black text-gray-900 mb-2">Presentation <span className="text-yellow-500">Bundle</span></h3>
+                                        <p className="text-gray-500 font-medium text-sm mb-8 px-8">
+                                            You've selected {selectedCredentials.size} credentials. This will create a local presentation proof for third-party verification.
+                                        </p>
+
+                                        <div className="space-y-3 mb-8">
+                                            <button onClick={handleCopyPresentation} className="w-full py-5 bg-yellow-400 text-black rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-yellow-400/20 hover:scale-[1.02] hover:bg-yellow-300 transition-all">
+                                                Bundle and Copy to Clipboard
+                                            </button>
+                                            <button onClick={() => setShowPresentationModal(false)} className="w-full py-5 bg-gray-50 text-gray-400 rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors">
+                                                Cancel Build
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest opacity-60">
+                                            Privacy Preservation: Selected data remains local till you share.
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+            </main>
+        </div>
+    );
 }

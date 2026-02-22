@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import { Navbar } from '@/components/Navbar';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
@@ -13,6 +12,22 @@ interface KycSession {
   status: string;
   completedAt: string;
 }
+
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
+    case 'completed':
+    case 'approved':
+      return 'bg-green-100 text-green-800';
+    case 'pending':
+    case 'in_progress':
+      return 'bg-blue-100 text-blue-800';
+    case 'failed':
+    case 'declined':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
 
 export default function KycSuccessPage() {
   const router = useRouter();
@@ -105,31 +120,14 @@ export default function KycSuccessPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
       </div>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'approved':
-      case 'completed':
-        return 'text-green-600 bg-green-100';
-      case 'pending':
-      case 'in review':
-        return 'text-yellow-600 bg-yellow-100';
-      case 'declined':
-        return 'text-red-600 bg-red-100';
-      default:
-        return 'text-gray-600 bg-gray-100';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
+    <div className="min-h-screen bg-white font-sans text-gray-900">
       <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
         {/* Success Message */}
         <div className="text-center mb-8">
@@ -171,7 +169,6 @@ export default function KycSuccessPage() {
             }`}>
               {identityTokenId ? (
                 <>
-                  <span className="mr-2">🏁</span>
                   Identity Minted!
                 </>
               ) : isMinting ? (

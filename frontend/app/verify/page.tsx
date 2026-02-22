@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRacePassProfile } from '@/hooks/useRacePassProfile';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
@@ -13,33 +15,54 @@ interface VerificationResult {
   issuer?: string;
   recipient?: string;
   details?: any;
+  eventName?: string;
+  reputationValue?: number;
 }
+
+// ─── Animation Helpers ────────────────────────────────────────────────────────
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 28 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as any, delay },
+});
+
+const fadeIn = (delay = 0) => ({
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.6, delay },
+});
 
 export default function VerifyPage() {
   const [input, setInput] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [results, setResults] = useState<VerificationResult[]>([]);
   const [presentationType, setPresentationType] = useState<'single' | 'bundle' | null>(null);
+  const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
+  const { data: profile, isLoading: profileLoading } = useRacePassProfile();
+
+  // Wait for client-side hydration
+  useEffect(() => {
+    const timer = setTimeout(() => setIsClient(true), 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Redirect unverified users to KYC
+  useEffect(() => {
+    if (isClient && !profileLoading && !profile?.identity?.isKycVerified) {
+      router.push('/kyc');
+    }
+  }, [isClient, profileLoading, profile?.identity?.isKycVerified, router]);
 
   const handleVerify = async () => {
-    if (!input.trim()) {
-      alert('Please paste a credential or presentation JSON');
-      return;
-    }
-
-    setIsVerifying(true);
-    setResults([]);
-    setPresentationType(null);
+    if (!input.trim()) { alert('Please paste a credential or presentation JSON'); return; }
+    setIsVerifying(true); setResults([]); setPresentationType(null);
 
     try {
       const parsed = JSON.parse(input);
-      
-      // Check if it's a presentation bundle or single attestation
       if (parsed.version && parsed.credentials && Array.isArray(parsed.credentials)) {
-        // It's a presentation bundle
         setPresentationType('bundle');
         const verificationResults: VerificationResult[] = [];
-
         for (const credential of parsed.credentials) {
           try {
             const response = await fetch(`${BACKEND_URL}/api/attest/verify`, {
@@ -47,293 +70,132 @@ export default function VerifyPage() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ attestation: credential.payload })
             });
-
             const data = await response.json();
-            verificationResults.push({
-              ...data,
-              eventName: credential.eventName,
-              reputationValue: credential.reputationValue
-            } as VerificationResult);
+            verificationResults.push({ ...data, eventName: credential.eventName, reputationValue: credential.reputationValue });
           } catch {
-            verificationResults.push({
-              success: false,
-              error: `Failed to verify credential: ${credential.eventName}`,
-              eventName: credential.eventName
-            } as VerificationResult);
+            verificationResults.push({ success: false, error: `Failed to verify: ${credential.eventName}`, eventName: credential.eventName });
           }
         }
-
         setResults(verificationResults);
       } else {
-        // It's a single attestation
         setPresentationType('single');
         const response = await fetch(`${BACKEND_URL}/api/attest/verify`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ attestation: parsed })
         });
-
         const data = await response.json();
         setResults([data]);
       }
     } catch {
-      setResults([{
-        success: false,
-        error: 'Invalid JSON format. Please paste a valid credential or presentation.'
-      }]);
-    } finally {
-      setIsVerifying(false);
-    }
+      setResults([{ success: false, error: 'Invalid JSON format. Check your input.' }]);
+    } finally { setIsVerifying(false); }
   };
 
-  const handleClear = () => {
-    setInput('');
-    setResults([]);
-    setPresentationType(null);
-  };
+  const handleClear = () => { setInput(''); setResults([]); setPresentationType(null); };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <div className="min-h-screen bg-white font-sans text-gray-900">
+      <main className="relative overflow-hidden bg-white min-h-[calc(100vh-64px)] pb-20">
+        {/* Grid Background */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: "radial-gradient(circle at 1px 1px, #f5c51833 1px, transparent 0)",
+            backgroundSize: "32px 32px",
+          }}
+        />
 
-      <main className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">🔍 Credential Verification Portal</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Verify the authenticity of RacePass credentials and presentations
-          </p>
-        </div>
+        <div className="relative mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8">
+          <motion.div {...fadeUp(0)} className="mb-10">
+            <motion.div {...fadeIn(0.1)} className="inline-flex items-center gap-2 rounded-full border border-yellow-400/50 bg-yellow-50 px-3 py-1 mb-3">
+              <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">Trust Audit Protocol</span>
+            </motion.div>
+            <h1 className="text-4xl font-black text-gray-900 tracking-tight">Identity <span className="text-yellow-500 underline decoration-yellow-400/40 underline-offset-4">Audit</span></h1>
+            <p className="mt-4 text-gray-500 font-medium max-w-xl">Paste a RacePass verifiable credential or bundle presentation to audit its authenticity on-chain.</p>
+          </motion.div>
 
-        {/* Info Banner */}
-        <div className="mb-8 bg-blue-50 rounded-xl border border-blue-200 p-6">
-          <div className="flex">
-            <div className="shrink-0">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+          <motion.div {...fadeUp(0.1)} className="bg-white/70 backdrop-blur-xl rounded-[3rem] p-10 border border-yellow-100 shadow-2xl shadow-yellow-900/5 transition-all duration-300">
+            <div className="mb-8">
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Payload Entry</label>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder='{"version": "1.0", ...}'
+                className="w-full h-48 rounded-3xl border-yellow-100 bg-yellow-50/30 p-6 font-mono text-xs focus:ring-yellow-500 focus:border-yellow-500 shadow-inner outline-none transition-all"
+              />
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">Public Verification Portal</h3>
-              <p className="mt-1 text-sm text-blue-700">
-                This is a public portal where anyone can verify RacePass credentials without needing a wallet. 
-                Simply paste the credential JSON received from a user and click verify to check its authenticity.
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* Input Section */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Paste Credential or Presentation</h2>
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder='Paste the credential JSON here, e.g.:
-{
-  "version": "1.0",
-  "issuer": "RacePass Platform",
-  "credentials": [...]
-}
-
-Or paste a single attestation payload.'
-            rows={12}
-            className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono text-xs p-4 border"
-          />
-          
-          <div className="mt-4 flex gap-3">
-            <button
-              onClick={handleVerify}
-              disabled={isVerifying || !input.trim()}
-              className={`flex-1 rounded-lg px-6 py-3 text-sm font-semibold text-white ${
-                isVerifying || !input.trim()
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-500'
-              }`}
-            >
-              {isVerifying ? 'Verifying...' : '🔍 Verify Credential'}
-            </button>
-            <button
-              onClick={handleClear}
-              className="rounded-lg bg-gray-100 px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-200"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        {/* Results Section */}
-        {results.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Verification Results
-              {presentationType === 'bundle' && (
-                <span className="ml-2 text-sm font-normal text-gray-600">
-                  (Presentation with {results.length} credential{results.length !== 1 ? 's' : ''})
-                </span>
-              )}
-            </h2>
-
-            <div className="space-y-4">
-              {results.map((result, index) => (
-                <div
-                  key={index}
-                  className={`rounded-lg border-2 p-6 ${
-                    result.success
-                      ? 'border-green-300 bg-green-50'
-                      : 'border-red-300 bg-red-50'
+            <div className="flex gap-4">
+              <button
+                onClick={handleVerify}
+                disabled={isVerifying || !input.trim()}
+                className={`flex-1 py-4 rounded-full font-black text-xs uppercase tracking-widest transition-all ${isVerifying || !input.trim() ? "bg-gray-100 text-gray-400" : "bg-yellow-400 text-black shadow-xl shadow-yellow-400/20 hover:bg-yellow-300 hover:scale-[1.02]"
                   }`}
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center">
-                      <div className={`text-2xl mr-3 ${result.success ? 'text-green-600' : 'text-red-600'}`}>
-                        {result.success ? '✅' : '❌'}
-                      </div>
-                      <div>
-                        <h3 className={`text-lg font-bold ${result.success ? 'text-green-800' : 'text-red-800'}`}>
-                          {result.success ? 'Verified Authentic' : 'Verification Failed'}
-                        </h3>
-                        {(result as any).eventName && (
-                          <p className="text-sm text-gray-700 font-semibold">
-                            Event: {(result as any).eventName}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {result.success && (
-                      <span className="inline-flex items-center rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white">
-                        Valid
-                      </span>
-                    )}
-                  </div>
-
-                  <p className={`text-sm mb-4 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
-                    {result.message || result.error}
-                  </p>
-
-                  {result.success && (
-                    <div className="border-t border-green-200 pt-4 space-y-2">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <dt className="text-xs text-green-600 font-medium">Issuer</dt>
-                          <dd className="text-sm text-gray-900 font-mono break-all">{result.issuer}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-xs text-green-600 font-medium">Recipient</dt>
-                          <dd className="text-sm text-gray-900 font-mono break-all">{result.recipient}</dd>
-                        </div>
-                      </div>
-
-                      {result.details && (
-                        <div className="mt-4 bg-white rounded p-3">
-                          <dt className="text-xs text-gray-600 font-medium mb-2">Credential Details</dt>
-                          <dd className="text-sm text-gray-900">
-                            {Object.entries(result.details).map(([key, value]) => (
-                              <div key={key} className="flex justify-between py-1">
-                                <span className="text-gray-600">{key}:</span>
-                                <span className="font-semibold">{String(value)}</span>
-                              </div>
-                            ))}
-                          </dd>
-                        </div>
-                      )}
-
-                      {(result as any).reputationValue && (
-                        <div className="mt-2 bg-purple-50 border border-purple-200 rounded p-3">
-                          <p className="text-sm text-purple-800">
-                            <strong>Reputation Value:</strong> +{(result as any).reputationValue} points
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+              >
+                {isVerifying ? "Auditing Profile..." : "Start Verification Audit"}
+              </button>
+              {input && (
+                <button onClick={handleClear} className="px-8 py-4 bg-gray-50 text-gray-400 rounded-full font-black text-xs uppercase hover:bg-gray-100 transition-colors">
+                  Clear
+                </button>
+              )}
             </div>
+          </motion.div>
 
-            {presentationType === 'bundle' && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-blue-800 mb-2">📊 Presentation Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-blue-900">{results.length}</div>
-                    <div className="text-xs text-blue-700">Total Credentials</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-green-600">
-                      {results.filter(r => r.success).length}
-                    </div>
-                    <div className="text-xs text-green-700">Verified</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-red-600">
-                      {results.filter(r => !r.success).length}
-                    </div>
-                    <div className="text-xs text-red-700">Failed</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-purple-600">
-                      {results.reduce((sum, r) => sum + ((r as any).reputationValue || 0), 0)}
-                    </div>
-                    <div className="text-xs text-purple-700">Total Reputation</div>
-                  </div>
+          {/* Results Section */}
+          <AnimatePresence>
+            {results.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-12 space-y-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-px bg-yellow-100 flex-1" />
+                  <h2 className="text-[10px] font-black text-yellow-500 uppercase tracking-widest px-4 py-1.5 border border-yellow-50 rounded-full bg-white shadow-sm">Audit Findings</h2>
+                  <div className="h-px bg-yellow-100 flex-1" />
                 </div>
-              </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  {results.map((res, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.1 }}
+                      className={`rounded-3xl border p-6 flex items-center justify-between transition-all ${res.success ? "bg-green-50/50 border-green-200 ring-4 ring-green-600/5 shadow-md shadow-green-900/5" : "bg-red-50/50 border-red-200 ring-4 ring-red-600/5 shadow-md shadow-red-900/5"
+                        }`}
+                    >
+                      <div className="flex items-center gap-5">
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${res.success ? "bg-green-100 text-green-600 shadow-inner" : "bg-red-100 text-red-600 shadow-inner"}`}>
+                          {res.success ? (
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-lg font-black text-gray-900 leading-tight">{res.eventName || (res.success ? "Authentic Credential" : "Invalid Payload")}</h4>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{res.success ? "On-Chain Sig Verified" : "Failed Signature Validation"}</p>
+                        </div>
+                      </div>
+                      {res.reputationValue && (
+                        <div className="text-right">
+                          <p className="text-xl font-black text-green-600">+{res.reputationValue} REP</p>
+                          <p className="text-[10px] font-bold text-gray-300 uppercase">Trust Impact</p>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="mt-8 p-10 bg-gray-900 rounded-[3rem] text-left text-white relative overflow-hidden group">
+                  <h4 className="text-sm font-black text-white uppercase tracking-wider mb-2 relative z-10">Audit Cryptographic Proofs</h4>
+                  <p className="text-xs text-gray-400 max-w-sm font-medium relative z-10">The RacePass audit engine validates off-chain attestations against the EAS deployment on-chain.</p>
+                </div>
+              </motion.div>
             )}
-          </div>
-        )}
-
-        {/* Help Section */}
-        <div className="mt-8 bg-gray-100 rounded-xl p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">How Verification Works</h3>
-          <div className="space-y-3 text-sm text-gray-700">
-            <div className="flex items-start">
-              <span className="text-blue-600 mr-2">1️⃣</span>
-              <p>
-                <strong>Cryptographic Signatures:</strong> Each credential is signed using EIP-712 by the RacePass issuer wallet.
-              </p>
-            </div>
-            <div className="flex items-start">
-              <span className="text-blue-600 mr-2">2️⃣</span>
-              <p>
-                <strong>Tamper-Proof:</strong> Any modification to the credential data will cause signature verification to fail.
-              </p>
-            </div>
-            <div className="flex items-start">
-              <span className="text-blue-600 mr-2">3️⃣</span>
-              <p>
-                <strong>Privacy-Preserving:</strong> Users can share only specific credentials without revealing their entire history.
-              </p>
-            </div>
-            <div className="flex items-start">
-              <span className="text-blue-600 mr-2">4️⃣</span>
-              <p>
-                <strong>Presentation Bundles:</strong> Multiple credentials can be bundled together for high-value verifications.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-gray-300">
-            <p className="text-sm text-gray-600 mb-3">
-              Want to issue your own verifiable credentials?
-            </p>
-            <Link
-              href="/credentials"
-              className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-            >
-              View Your Credentials →
-            </Link>
-          </div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

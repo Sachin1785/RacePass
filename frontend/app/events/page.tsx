@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useAccount } from 'wagmi';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
 
@@ -24,6 +24,19 @@ interface Event {
   maxTickets: number;
   isActive: boolean;
 }
+
+// ─── Animation Helpers ────────────────────────────────────────────────────────
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 28 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as any, delay },
+});
+
+const fadeIn = (delay = 0) => ({
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  transition: { duration: 0.6, delay },
+});
 
 export default function EventsPage() {
   const { address, isConnected } = useAccount();
@@ -46,7 +59,6 @@ export default function EventsPage() {
         setIsLoading(false);
       }
     };
-
     fetchEvents();
   }, []);
 
@@ -54,16 +66,13 @@ export default function EventsPage() {
     if (!profile?.identity) return false;
     if (!profile.identity.isKycVerified && event.requiresKyc) return false;
     if (profile.identity.isRevoked) return false;
-    
-    const activeRep = parseInt(profile.identity.activeReputation);
+    const activeRep = parseInt(profile.identity.activeReputation || '0');
     if (activeRep < event.minReputation) return false;
-    
     return true;
   };
 
   const handleMintTicket = async (event: Event) => {
     if (!address || !canAccessEvent(event)) return;
-    
     setMintingEventId(event.id);
     try {
       const response = await fetch(`${BACKEND_URL}/api/tickets/mint`, {
@@ -78,16 +87,12 @@ export default function EventsPage() {
           maxResalePrice: '0.1'
         })
       });
-
       const result = await response.json();
       if (result.success) {
         alert(`Ticket minted successfully! Token ID: ${result.onChainId}`);
-        // Refresh events to update ticket count
         const eventsResponse = await fetch(`${BACKEND_URL}/api/events`);
         const eventsData = await eventsResponse.json();
-        if (eventsData.success) {
-          setEvents(eventsData.events);
-        }
+        if (eventsData.success) { setEvents(eventsData.events); }
       } else {
         alert(`Failed to mint ticket: ${result.error}`);
       }
@@ -98,278 +103,201 @@ export default function EventsPage() {
       setMintingEventId(null);
     }
   };
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900">Upcoming Events</h1>
-          <p className="mt-2 text-lg text-gray-600">
-            Discover and access exclusive events using your verified credentials
-          </p>
-        </div>
 
-        {/* Info Banner */}
-        <div className="mb-8 bg-blue-50 rounded-xl border border-blue-200 p-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">KYC Required</h3>
-              <p className="mt-1 text-sm text-blue-700">
-                All events require verified credentials. Complete KYC once to access all age-restricted
-                events without repeating the verification process.
+  return (
+    <div className="min-h-screen bg-white font-sans text-gray-900">
+
+      <main className="relative overflow-hidden bg-white min-h-[calc(100vh-64px)] pb-20">
+        {/* Grid Background */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 1px 1px, #f5c51833 1px, transparent 0)',
+            backgroundSize: '32px 32px',
+          }}
+        />
+
+        <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+
+          {/* Header Section */}
+          <motion.div {...fadeUp(0)} className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div>
+              <motion.div {...fadeIn(0.1)} className="inline-flex items-center gap-2 rounded-full border border-yellow-400/50 bg-yellow-50 px-3 py-1 mb-3">
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">
+                  RacePass Ecosystem
+                </span>
+              </motion.div>
+              <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                Upcoming <span className="text-yellow-500 underline decoration-yellow-400/40 underline-offset-4">Experiences</span>
+              </h1>
+              <p className="mt-2 text-gray-500 font-medium">
+                Discover high-stakes events protected by on-chain identity. One verified profile, infinite access.
               </p>
             </div>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex justify-center py-12">
-            <div className="text-gray-500">Loading events...</div>
-          </div>
-        )}
-
-        {/* Events Grid */}
-        {!isLoading && (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => {
-              const isSoldOut = event.ticketsMinted >= event.maxTickets;
-              const canAccess = canAccessEvent(event);
-              const activeRep = profile?.identity ? parseInt(profile.identity.activeReputation) : 0;
-              const needsMoreRep = activeRep < event.minReputation;
-              const isMinting = mintingEventId === event.id;
-
-              return (
-                <div
-                  key={event.id}
-                  className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  <div className="relative h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-6xl">
-                    {event.image}
-                    {isSoldOut && (
-                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-                        <span className="text-white text-2xl font-bold">SOLD OUT</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
-                          {event.minAge}+
-                        </span>
-                        {event.minReputation > 0 && (
-                          <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-800">
-                            Rep {event.minReputation}+
-                          </span>
-                        )}
-                      </div>
-                      {event.requiresKyc && (
-                        <span className="inline-flex items-center text-xs text-gray-500">
-                          <svg
-                            className="h-4 w-4 mr-1"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                            />
-                          </svg>
-                          KYC Required
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      {event.name}
-                    </h3>
-                    
-                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                      {event.description}
-                    </p>
-
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center text-sm text-gray-500">
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                        {new Date(event.date).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </div>
-                      
-                      <div className="flex items-center text-sm text-gray-500">
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                        </svg>
-                        {event.location}
-                      </div>
-
-                      {/* Ticket Availability */}
-                      <div className="flex items-center text-sm text-gray-500">
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"
-                          />
-                        </svg>
-                        {event.ticketsMinted}/{event.maxTickets} tickets minted
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                      <span className="text-lg font-bold text-gray-900">
-                        {event.price}
-                      </span>
-                      
-                      {!isConnected ? (
-                        <button
-                          disabled
-                          className="rounded-full bg-gray-300 px-4 py-2 text-sm font-semibold text-gray-500 cursor-not-allowed"
-                        >
-                          Connect Wallet
-                        </button>
-                      ) : !profile?.identity ? (
-                        <Link
-                          href="/kyc"
-                          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-                        >
-                          Complete KYC
-                        </Link>
-                      ) : isSoldOut ? (
-                        <button
-                          disabled
-                          className="rounded-full bg-red-300 px-4 py-2 text-sm font-semibold text-red-800 cursor-not-allowed"
-                        >
-                          Sold Out
-                        </button>
-                      ) : needsMoreRep ? (
-                        <button
-                          disabled
-                          className="rounded-full bg-purple-300 px-4 py-2 text-sm font-semibold text-purple-800 cursor-not-allowed"
-                          title={`Need ${event.minReputation} reputation (you have ${activeRep})`}
-                        >
-                          Need Rep {event.minReputation}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleMintTicket(event)}
-                          disabled={!canAccess || isMinting}
-                          className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                            canAccess && !isMinting
-                              ? 'bg-green-600 text-white hover:bg-green-500'
-                              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          }`}
-                        >
-                          {isMinting ? 'Minting...' : 'Mint Ticket'}
-                        </button>
-                      )}
-                    </div>
+          {/* Verification Status (Toast-like) */}
+          <AnimatePresence>
+            {!profile?.identity?.isKycVerified && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mb-12 bg-linear-to-r from-yellow-400 to-amber-500 rounded-2xl p-6 text-black shadow-xl shadow-yellow-400/20 flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative"
+              >
+                <div className="flex items-center gap-4 relative z-10">
+                  <div>
+                    <h4 className="font-black text-lg">Limited Access Mode</h4>
+                    <p className="text-white/80 text-sm font-medium">Connect and verify your KYC to unlock all events.</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <Link href="/kyc" className="bg-black text-yellow-400 font-black px-8 py-3 rounded-full text-sm hover:scale-105 transition-transform relative z-10">
+                  Verify Now →
+                </Link>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Empty State */}
-        {!isLoading && events.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No events available at the moment.</p>
-          </div>
-        )}
+          {/* Loading State */}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mb-4"></div>
+              <p className="text-gray-400 font-bold uppercase tracking-widest text-xs">Syncing Global Events...</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {events.map((event, idx) => {
+                const isSoldOut = event.ticketsMinted >= event.maxTickets;
+                const canAccess = canAccessEvent(event);
+                const activeRep = profile?.identity ? parseInt(profile.identity.activeReputation || '0') : 0;
+                const needsMoreRep = activeRep < event.minReputation;
+                const isMinting = mintingEventId === event.id;
 
-        {/* CTA Section */}
-        {isConnected && !profile?.identity && (
-          <div className="mt-12 text-center bg-white rounded-xl shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Ready to Access Events?
-            </h2>
-            <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-              Complete your KYC verification to unlock access to age-restricted events.
-              Verify once, use everywhere—no more repetitive identity checks.
-            </p>
-            <Link
-              href="/kyc"
-              className="inline-flex items-center rounded-full bg-blue-600 px-8 py-3 text-base font-semibold text-white shadow-sm hover:bg-blue-500"
-            >
-              Complete KYC Verification
-            </Link>
-          </div>
-        )}
+                return (
+                  <motion.div
+                    key={event.id}
+                    {...fadeUp(0.1 + idx * 0.05)}
+                    className="group relative flex flex-col bg-white rounded-3xl border border-yellow-100 overflow-hidden hover:shadow-2xl hover:shadow-yellow-400/10 transition-all duration-500"
+                  >
+                    {/* Visual Header */}
+                    <div className="relative h-56 bg-linear-to-br from-yellow-100 to-yellow-50 flex items-center justify-center overflow-hidden">
+                      <div className="absolute inset-0 opacity-10 group-hover:scale-110 transition-transform duration-700 pointer-events-none"
+                        style={{ backgroundImage: 'radial-gradient(circle at center, #facc15 2px, transparent 0)', backgroundSize: '16px 16px' }} />
 
-        {/* Reputation Info */}
-        {isConnected && profile?.identity && (
-          <div className="mt-12 text-center bg-purple-50 rounded-xl border border-purple-200 p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Your Reputation: {profile.identity.activeReputation}
-            </h2>
-            <p className="text-gray-600 mb-2 max-w-2xl mx-auto">
-              Earn reputation by attending events and participating in the RacePass ecosystem.
-              Higher reputation unlocks exclusive premium events.
-            </p>
-            <p className="text-sm text-gray-500">
-              Base Reputation: {profile.identity.baseReputation} | Active Reputation: {profile.identity.activeReputation}
-            </p>
-          </div>
-        )}
+                      {/* Overlay Status */}
+                      <div className="absolute top-5 left-5 right-5 flex justify-between items-start pointer-events-none">
+                        <div className="flex flex-col gap-2">
+                          <div className="px-3 py-1 bg-white/80 backdrop-blur-md rounded-full border border-white text-[10px] font-black text-gray-900 uppercase">
+                            {event.minAge}+ Verified
+                          </div>
+                          {event.minReputation > 0 && (
+                            <div className="px-3 py-1 bg-yellow-500 rounded-full text-[10px] font-black text-white uppercase shadow-lg shadow-yellow-500/20">
+                              Rep {event.minReputation}+
+                            </div>
+                          )}
+                        </div>
+                        {event.requiresKyc && (
+                          <div className="w-8 h-8 bg-white/80 backdrop-blur-md rounded-full border border-white flex items-center justify-center text-yellow-600 shadow-sm" title="KYC Required">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+
+                      {isSoldOut && (
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] flex items-center justify-center">
+                          <span className="text-white text-2xl font-black tracking-widest uppercase rotate-[-12deg] border-4 border-white px-4 py-1">Sold Out</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-8 flex flex-col flex-1">
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-1 opacity-80">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" strokeWidth="3" />
+                          </svg>
+                          {event.location}
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-900 leading-tight group-hover:text-yellow-500 transition-colors">{event.name}</h3>
+                      </div>
+
+                      <p className="text-sm text-gray-500 font-medium mb-6 line-clamp-2 leading-relaxed">
+                        {event.description}
+                      </p>
+
+                      <div className="mt-auto space-y-6">
+                        {/* Availability Bar */}
+                        <div className="space-y-2 text-xs font-bold uppercase tracking-tighter">
+                          <div className="flex justify-between items-end">
+                            <span className="text-gray-400">Tickets Available</span>
+                            <span className="text-gray-900">{Math.max(0, event.maxTickets - event.ticketsMinted)} Left</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${(event.ticketsMinted / event.maxTickets) * 100}%` }}
+                              className="h-full bg-linear-to-r from-yellow-400 to-yellow-500 rounded-full"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-black text-gray-300 uppercase">Mint Price</p>
+                            <p className="text-xl font-black text-gray-900 tracking-tighter">{event.price}</p>
+                          </div>
+
+                          {!isConnected ? (
+                            <button disabled className="bg-gray-100 text-gray-400 px-6 py-3 rounded-2xl text-xs font-black uppercase pointer-events-none">
+                              Locked
+                            </button>
+                          ) : !profile?.identity ? (
+                            <Link href="/kyc" className="bg-yellow-100 text-yellow-700 px-6 py-3 rounded-2xl text-xs font-black uppercase hover:bg-yellow-200 transition-colors">
+                              Verify
+                            </Link>
+                          ) : isSoldOut ? (
+                            <button disabled className="bg-red-50 text-red-400 px-6 py-3 rounded-2xl text-xs font-black uppercase">
+                              Full
+                            </button>
+                          ) : needsMoreRep ? (
+                            <button disabled className="bg-purple-50 text-purple-400 px-6 py-3 rounded-2xl text-xs font-black uppercase text-center leading-tight">
+                              Need<br />{event.minReputation} REP
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleMintTicket(event)}
+                              disabled={!canAccess || isMinting}
+                              className={`px-8 py-3 rounded-2xl text-xs font-black uppercase shadow-lg transition-all ${canAccess && !isMinting
+                                ? 'bg-linear-to-br from-yellow-400 to-yellow-500 text-black shadow-yellow-400/20 hover:scale-[1.05] active:scale-95'
+                                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                }`}
+                            >
+                              {isMinting ? 'Minting...' : 'Access Now'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && events.length === 0 && (
+            <motion.div {...fadeIn(0.2)} className="text-center py-32 bg-yellow-50/50 rounded-3xl border border-dashed border-yellow-200">
+              <h3 className="text-2xl font-black text-gray-900 mb-2">No Active Seasons</h3>
+              <p className="text-gray-500 font-medium">The racing season is currently cooling down. Check back shortly.</p>
+            </motion.div>
+          )}
+
+          {/* Footer Stats */}
+        </div>
       </main>
     </div>
   );
