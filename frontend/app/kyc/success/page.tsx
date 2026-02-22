@@ -13,19 +13,19 @@ interface KycSession {
   completedAt: string;
 }
 
-const getStatusColor = (status: string): string => {
-  const statusLower = status.toLowerCase();
-  switch (statusLower) {
-    case 'approved':
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
     case 'completed':
-      return 'bg-green-50 border border-green-200 text-green-700';
-    case 'in review':
-      return 'bg-blue-50 border border-blue-200 text-blue-700';
+    case 'approved':
+      return 'bg-green-100 text-green-800';
+    case 'pending':
+    case 'in_progress':
+      return 'bg-blue-100 text-blue-800';
+    case 'failed':
     case 'declined':
-    case 'rejected':
-      return 'bg-red-50 border border-red-200 text-red-700';
+      return 'bg-red-100 text-red-800';
     default:
-      return 'bg-gray-50 border border-gray-200 text-gray-700';
+      return 'bg-gray-100 text-gray-800';
   }
 };
 
