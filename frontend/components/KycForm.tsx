@@ -16,11 +16,11 @@ export function KycForm() {
   useEffect(() => {
     const checkKycStatus = async () => {
       if (!address) return;
-      
+
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/kyc/status/${address.toLowerCase()}`);
         const result = await response.json();
-        
+
         if (result.success && result.isVerified) {
           // Already verified, redirect to dashboard or success with a flag
           router.push('/dashboard');
@@ -38,7 +38,7 @@ export function KycForm() {
   // Load Didit SDK dynamically
   useEffect(() => {
     if (isCheckingKyc) return; // Don't load until we mark check as done
-    
+
     const loadSdk = async () => {
       try {
         await import('@didit-protocol/sdk-web');
@@ -96,7 +96,7 @@ export function KycForm() {
       // Initialize Didit SDK with callbacks
       DiditSdk.shared.onComplete = (completionResult) => {
         console.log('Verification completed:', completionResult);
-        
+
         switch (completionResult.type) {
           case 'completed':
             // Store session info and redirect to success page
@@ -107,12 +107,12 @@ export function KycForm() {
             }));
             router.push('/kyc/success');
             break;
-          
+
           case 'cancelled':
             setError('Verification was cancelled. Please try again.');
             setIsLoading(false);
             break;
-          
+
           case 'failed':
             setError(completionResult.error?.message || 'Verification failed');
             setIsLoading(false);
@@ -155,7 +155,7 @@ export function KycForm() {
   if (isCheckingKyc) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-500 mb-4"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-yellow-500 mb-4"></div>
         <p className="text-gray-500 text-sm font-medium">Checking KYC status...</p>
       </div>
     );
@@ -164,15 +164,15 @@ export function KycForm() {
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       {/* Information Panel */}
-      <div className="rounded-xl bg-amber-50 p-6 border border-amber-100 shadow-sm relative overflow-hidden group">
+      <div className="rounded-xl bg-yellow-50 p-6 border border-yellow-200 shadow-sm relative overflow-hidden group">
         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-          <svg className="w-16 h-16 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-16 h-16 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
           </svg>
         </div>
         <div className="flex relative z-10">
           <div className="shrink-0">
-            <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+            <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600">
               <svg className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -184,10 +184,10 @@ export function KycForm() {
           </div>
           <div className="ml-4">
             <h3 className="text-base font-black text-gray-900 leading-none mb-2">Powered by Didit Identity</h3>
-            <div className="text-sm text-gray-600 leading-relaxed font-medium">
+            <div className="text-sm text-gray-500 leading-relaxed font-medium">
               <p>
-                Secure your digital racing identity. You&apos;ll be guided through a quick 
-                document capture and face verification process. 
+                Secure your digital racing identity. You&apos;ll be guided through a quick
+                document capture and face verification process.
                 Everything is encrypted and privacy-protected.
               </p>
             </div>
@@ -197,7 +197,7 @@ export function KycForm() {
 
       {/* Error Display */}
       {error && (
-        <div className="rounded-xl bg-red-50 p-4 border border-red-100 animate-shake">
+        <div className="rounded-xl bg-red-50 p-4 border border-red-200">
           <div className="flex">
             <div className="shrink-0">
               <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
@@ -209,7 +209,7 @@ export function KycForm() {
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-red-700 font-medium">{error}</p>
+              <p className="text-sm text-red-600 font-medium">{error}</p>
             </div>
           </div>
         </div>
@@ -220,11 +220,11 @@ export function KycForm() {
         <button
           onClick={startVerification}
           disabled={isLoading || !isSdkLoaded}
-          className="group relative w-full max-w-md flex items-center justify-center rounded-xl bg-amber-500 px-8 py-4 text-lg font-black text-white shadow-xl shadow-amber-200/50 hover:bg-amber-600 focus:outline-none focus:ring-4 focus:ring-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-1 active:translate-y-0 overflow-hidden"
+          className="group relative w-full max-w-md flex items-center justify-center rounded-xl bg-yellow-400 px-8 py-4 text-lg font-black text-black shadow-xl shadow-yellow-400/20 hover:bg-yellow-300 focus:outline-none focus:ring-4 focus:ring-yellow-400/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 hover:-translate-y-1 active:translate-y-0 overflow-hidden"
         >
           {/* Button Shine effect */}
           <div className="absolute inset-0 w-1/2 h-full bg-linear-to-r from-transparent via-white/10 to-transparent -skew-x-12 -translate-x-full group-hover:translate-x-[250%] transition-transform duration-1000" />
-          
+
           {isLoading ? (
             <>
               <svg className="animate-spin -ml-1 mr-3 h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -235,12 +235,11 @@ export function KycForm() {
             </>
           ) : (
             <>
-              <span className="mr-3 text-xl">🛡️</span>
               Start Verification
             </>
           )}
         </button>
-        <p className="text-xs text-gray-400 font-medium flex items-center gap-2">
+        <p className="text-xs text-gray-500 font-medium flex items-center gap-2">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
           </svg>
@@ -252,11 +251,11 @@ export function KycForm() {
       <div className="pt-4 border-t border-gray-100">
         <div className="grid grid-cols-3 gap-2">
           {["Identify", "Verify", "Access"].map((step, i) => (
-            <div key={i} className="flex flex-col items-center gap-1 opacity-50 group">
-              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-400 group-hover:bg-amber-100 group-hover:text-amber-600 transition-colors">
+            <div key={i} className="flex flex-col items-center gap-1 group">
+              <div className="w-8 h-8 rounded-full bg-yellow-50 flex items-center justify-center text-xs font-bold text-yellow-600 group-hover:bg-yellow-100 group-hover:text-yellow-700 transition-colors">
                 {i + 1}
               </div>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">{step}</span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-gray-800">{step}</span>
             </div>
           ))}
         </div>

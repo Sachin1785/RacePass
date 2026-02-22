@@ -13,6 +13,22 @@ interface KycSession {
   completedAt: string;
 }
 
+const getStatusColor = (status: string): string => {
+  const statusLower = status.toLowerCase();
+  switch (statusLower) {
+    case 'approved':
+    case 'completed':
+      return 'bg-green-50 border border-green-200 text-green-700';
+    case 'in review':
+      return 'bg-blue-50 border border-blue-200 text-blue-700';
+    case 'declined':
+    case 'rejected':
+      return 'bg-red-50 border border-red-200 text-red-700';
+    default:
+      return 'bg-gray-50 border border-gray-200 text-gray-700';
+  }
+};
+
 export default function KycSuccessPage() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
@@ -153,7 +169,6 @@ export default function KycSuccessPage() {
             }`}>
               {identityTokenId ? (
                 <>
-                  <span className="mr-2">🏁</span>
                   Identity Minted!
                 </>
               ) : isMinting ? (

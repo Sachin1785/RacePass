@@ -3,141 +3,122 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ConnectWallet } from './ConnectWallet';
-import { motion } from 'framer-motion';
 import { useRacePassProfile } from '@/hooks/useRacePassProfile';
+
+const navItems = [
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+      </svg>
+    ),
+  },
+  {
+    href: '/events',
+    label: 'Events',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/kyc',
+    label: 'KYC Verification',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/credentials',
+    label: 'Credentials',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+      </svg>
+    ),
+  },
+  {
+    href: '/verify',
+    label: 'Verify Identity',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
+  },
+];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: profile } = useRacePassProfile();
 
-  const links = [
-    { href: '/events', label: 'Events', icon: '🎟️' },
-    { href: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { href: '/credentials', label: 'Credentials', icon: '🛡️' },
-    { href: '/verify', label: 'Verify', icon: '🔍' },
-    { href: '/kyc', label: 'KYC', icon: '✓', highlight: !profile?.identity?.isKycVerified },
-  ];
-
   return (
-    <>
-      {/* Desktop Sidebar */}
-      <motion.aside
-        initial={{ x: -280, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
-        className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col"
-      >
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white border-r border-amber-100 px-6 pb-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 pt-8 pb-4 group">
-            <div className="w-10 h-10 rounded-xl bg-linear-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform duration-200">
-              <span className="text-white font-black text-lg">R</span>
-            </div>
-            <div>
-              <span className="text-2xl font-black text-gray-900 tracking-tight block leading-none">
-                Race<span className="text-amber-500">Pass</span>
-              </span>
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                Universal ID
-              </span>
-            </div>
-          </Link>
-
-          {/* Navigation */}
-          <nav className="flex flex-1 flex-col gap-1">
-            {links.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`group relative flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition-all duration-200 ${
-                    isActive
-                      ? 'bg-linear-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-orange-500/20'
-                      : 'text-gray-600 hover:bg-amber-50 hover:text-gray-900'
-                  }`}
-                >
-                  <span className="text-xl">{link.icon}</span>
-                  <span className="uppercase tracking-wider">{link.label}</span>
-                  {link.highlight && (
-                    <span className="ml-auto flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-
-            {/* KYC Status Badge */}
-            {profile?.identity && (
-              <div className="mt-auto mb-4 p-4 rounded-2xl bg-linear-to-br from-amber-50 to-orange-50 border border-amber-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`w-2 h-2 rounded-full ${profile.identity.isKycVerified ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    Identity Status
-                  </span>
-                </div>
-                <p className="text-sm font-black text-gray-900 mb-1">
-                  {profile.identity.isKycVerified ? 'Verified' : 'Not Verified'}
-                </p>
-                <p className="text-xs font-bold text-amber-600">
-                  Reputation: {profile.identity.activeReputation}
-                </p>
-              </div>
-            )}
-
-            {/* Connect Wallet */}
-            <div className="mt-4">
-              <ConnectWallet />
-            </div>
-          </nav>
-        </div>
-      </motion.aside>
-
-      {/* Mobile Top Bar */}
-      <div className="lg:hidden sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-amber-100 bg-white/95 backdrop-blur-md px-4 shadow-sm">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-linear-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-sm">
-            <span className="text-white font-black text-sm">R</span>
+    <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+      <div className="flex grow flex-col gap-y-2 overflow-y-auto bg-white border-r border-gray-200 px-5 pb-6 pt-6">
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shadow-sm">
+            <span className="text-black font-black text-base">R</span>
           </div>
-          <span className="text-xl font-black text-gray-900 tracking-tight">
-            Race<span className="text-amber-500">Pass</span>
-          </span>
-        </Link>
-        <div className="ml-auto">
-          <ConnectWallet />
+          <div>
+            <span className="text-xl font-black text-gray-900 tracking-tight">
+              Race<span className="text-yellow-500">Pass</span>
+            </span>
+            <p className="text-[10px] text-gray-400 font-medium tracking-widest uppercase -mt-0.5">
+              Web3 Racing ID
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-amber-100 px-2 py-2 shadow-lg">
-        <div className="flex items-center justify-around">
-          {links.slice(0, 5).map((link) => {
-            const isActive = pathname === link.href;
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
             return (
               <Link
-                key={link.href}
-                href={link.href}
-                className={`relative flex flex-col items-center gap-1 rounded-xl px-3 py-2 transition-all ${
-                  isActive
-                    ? 'bg-amber-50 text-amber-600'
-                    : 'text-gray-500'
-                }`}
+                key={item.href}
+                href={item.href}
+                className={`group relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${isActive
+                  ? 'bg-yellow-400 text-black shadow-sm'
+                  : 'text-gray-500 hover:bg-yellow-50 hover:text-gray-900'
+                  }`}
               >
-                <span className="text-xl">{link.icon}</span>
-                <span className="text-[9px] font-black uppercase tracking-tight">{link.label}</span>
-                {link.highlight && (
-                  <span className="absolute top-1 right-1 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
+                <span className={isActive ? 'text-black' : 'text-gray-400 group-hover:text-yellow-500'}>
+                  {item.icon}
+                </span>
+                {item.label}
+                {isActive && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-black/30" />
                 )}
               </Link>
             );
           })}
+        </nav>
+
+        {/* KYC Status */}
+        {profile?.identity && (
+          <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-yellow-700 uppercase tracking-widest">
+                {profile.identity.isKycVerified ? '✓ Verified' : '⚠ Pending'}
+              </span>
+            </div>
+            <p className="text-[10px] text-yellow-600 mt-0.5">
+              RacePass #{profile.identity.tokenId}
+            </p>
+          </div>
+        )}
+
+        {/* Spacer */}
+        <div className="mt-auto pt-4 border-t border-gray-100">
+          <ConnectWallet />
         </div>
       </div>
-    </>
+    </aside>
   );
 }

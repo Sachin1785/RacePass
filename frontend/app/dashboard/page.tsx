@@ -122,7 +122,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-white">
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
             <p className="mt-4 text-gray-500 font-medium">
               Loading your ecosystem...
             </p>
@@ -146,19 +146,16 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
-      <main className="relative overflow-hidden bg-linear-to-b from-amber-50 via-white to-white min-h-[calc(100vh-64px)] pb-20">
+      <main className="relative overflow-hidden bg-white min-h-[calc(100vh-64px)] pb-20">
         {/* Grid Background */}
         <div
-          className="pointer-events-none absolute inset-0 opacity-40"
+          className="pointer-events-none absolute inset-0 opacity-30"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 1px 1px, #f59e0b22 1px, transparent 0)",
+              "radial-gradient(circle at 1px 1px, #f5c51833 1px, transparent 0)",
             backgroundSize: "32px 32px",
           }}
         />
-        {/* Glow Blobs */}
-        <div className="pointer-events-none absolute -top-24 left-1/4 w-175 h-100 rounded-full bg-amber-200/30 blur-3xl opacity-60" />
-        <div className="pointer-events-none absolute bottom-0 right-0 w-175 h-100 rounded-full bg-orange-100/20 blur-3xl opacity-60" />
 
         <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           {/* Header */}
@@ -169,16 +166,16 @@ export default function DashboardPage() {
             <div>
               <motion.div
                 {...fadeIn(0.1)}
-                className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 mb-3"
+                className="inline-flex items-center gap-2 rounded-full border border-yellow-400/50 bg-yellow-50 px-3 py-1 mb-3"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">
                   User Dashboard
                 </span>
               </motion.div>
               <h1 className="text-4xl font-black text-gray-900 tracking-tight">
                 RacePass{" "}
-                <span className="text-amber-500 underline decoration-amber-200 underline-offset-4">
+                <span className="text-yellow-500 underline decoration-yellow-400/40 underline-offset-4">
                   Control
                 </span>
               </h1>
@@ -187,15 +184,15 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md border border-amber-100 rounded-2xl px-4 py-2 shadow-sm">
-              <div className="w-8 h-8 rounded-full bg-linear-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-white text-xs font-bold">
+            <div className="flex items-center gap-2 bg-yellow-50 backdrop-blur-md border border-yellow-200 rounded-2xl px-4 py-2 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-yellow-400 flex items-center justify-center text-black text-xs font-bold">
                 {address?.substring(2, 4).toUpperCase()}
               </div>
               <div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
+                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
                   Connected Wallet
                 </p>
-                <p className="text-xs font-mono text-gray-600 font-semibold">
+                <p className="text-xs font-mono text-gray-700 font-semibold">
                   {address?.substring(0, 6)}...
                   {address?.substring(address.length - 4)}
                 </p>
@@ -207,17 +204,14 @@ export default function DashboardPage() {
             {/* ── LEFT: IDENTITY CARD ────────────────────────────────────────── */}
             <motion.div {...fadeUp(0.1)} className="lg:col-span-8 space-y-6">
               {profileLoading ? (
-                <div className="bg-white/80 backdrop-blur-xl border border-white rounded-3xl p-12 text-center shadow-xl shadow-amber-900/5">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
+                <div className="bg-white border border-yellow-100 rounded-3xl p-12 text-center shadow-lg">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
                   <p className="mt-4 text-gray-500 font-medium">
                     Syncing profile...
                   </p>
                 </div>
               ) : profile?.identity ? (
-                <div className="relative group overflow-hidden bg-linear-to-br from-amber-500 to-orange-600 rounded-3xl p-8 text-white shadow-2xl shadow-orange-600/20">
-                  {/* Decorative Elements */}
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl group-hover:bg-white/20 transition-all duration-700" />
-                  <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full -ml-10 -mb-10 blur-2xl" />
+                <div className="relative group overflow-hidden bg-yellow-400 rounded-3xl p-8 text-black shadow-2xl shadow-yellow-400/10">
 
                   <div className="relative flex flex-col md:flex-row justify-between gap-8">
                     <div className="space-y-6">
@@ -242,21 +236,21 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 group/stat hover:bg-white/15 transition-colors">
-                          <p className="text-xs font-bold text-amber-100 uppercase tracking-widest mb-1">
+                        <div className="bg-black/10 backdrop-blur-md border border-black/10 rounded-2xl p-4 group/stat hover:bg-black/20 transition-colors">
+                          <p className="text-xs font-bold text-black/60 uppercase tracking-widest mb-1">
                             Reputation Score
                           </p>
                           <div className="flex items-end gap-2">
                             <span className="text-4xl font-black">
                               {profile.identity.activeReputation}
                             </span>
-                            <span className="text-xs mb-1 text-green-300 font-bold">
+                            <span className="text-xs mb-1 text-green-700 font-bold">
                               Good Standing
                             </span>
                           </div>
                         </div>
-                        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4">
-                          <p className="text-xs font-bold text-amber-100 uppercase tracking-widest mb-1">
+                        <div className="bg-black/10 backdrop-blur-md border border-black/10 rounded-2xl p-4">
+                          <p className="text-xs font-bold text-black/60 uppercase tracking-widest mb-1">
                             Status
                           </p>
                           <div className="flex items-center gap-2 mt-1">
@@ -294,10 +288,10 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white border border-amber-100 rounded-3xl p-12 text-center shadow-lg shadow-amber-900/5">
-                  <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <div className="bg-[#111] border border-white/10 rounded-3xl p-12 text-center shadow-lg">
+                  <div className="w-20 h-20 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto mb-6">
                     <svg
-                      className="w-10 h-10 text-amber-500"
+                      className="w-10 h-10 text-yellow-400"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -310,7 +304,7 @@ export default function DashboardPage() {
                       />
                     </svg>
                   </div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-2">
+                  <h3 className="text-2xl font-black text-white mb-2">
                     No Racing Identity Found
                   </h3>
                   <p className="text-gray-500 max-w-sm mx-auto mb-8">
@@ -319,7 +313,7 @@ export default function DashboardPage() {
                   </p>
                   <Link
                     href="/kyc"
-                    className="inline-flex items-center gap-2 rounded-full bg-linear-to-r from-amber-500 to-orange-600 px-8 py-4 text-sm font-bold text-white shadow-xl shadow-orange-500/20 hover:scale-105 transition-transform"
+                    className="inline-flex items-center gap-2 rounded-full bg-yellow-400 px-8 py-4 text-sm font-bold text-black shadow-xl shadow-yellow-400/20 hover:scale-105 transition-transform"
                   >
                     Start Verification Flow
                     <svg
@@ -350,7 +344,7 @@ export default function DashboardPage() {
                   </h3>
                   <Link
                     href="/events"
-                    className="text-xs font-bold text-amber-600 hover:text-amber-700 transition-colors uppercase tracking-widest"
+                    className="text-xs font-bold text-yellow-600 hover:text-yellow-700 transition-colors uppercase tracking-widest"
                   >
                     Browse More →
                   </Link>
@@ -362,18 +356,17 @@ export default function DashboardPage() {
                       <motion.div
                         key={ticket.dbId}
                         {...fadeUp(0.1 + idx * 0.05)}
-                        className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:shadow-xl ${
-                          ticket.isCheckedIn
-                            ? "bg-gray-50/50 border-gray-100 grayscale"
-                            : "bg-white border-amber-100 hover:border-amber-300 shadow-md shadow-amber-900/5"
-                        }`}
+                        className={`group relative overflow-hidden rounded-3xl border p-5 transition-all duration-300 hover:shadow-xl ${ticket.isCheckedIn
+                          ? "bg-gray-50 border-gray-100 grayscale"
+                          : "bg-white border-yellow-100 hover:border-yellow-300 shadow-md shadow-yellow-900/5"
+                          }`}
                       >
                         <div className="flex justify-between items-start">
                           <div className="space-y-1">
-                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest opacity-80">
+                            <p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest opacity-80">
                               Reserved Access
                             </p>
-                            <h4 className="text-lg font-black text-gray-900 group-hover:text-amber-600 transition-colors">
+                            <h4 className="text-lg font-black text-gray-900 group-hover:text-yellow-600 transition-colors">
                               {ticket.eventName}
                             </h4>
                             <p className="text-xs font-mono text-gray-400">
@@ -381,11 +374,10 @@ export default function DashboardPage() {
                             </p>
                           </div>
                           <div
-                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${
-                              ticket.isCheckedIn
-                                ? "bg-gray-100 text-gray-400 border-gray-200"
-                                : "bg-amber-50 text-amber-600 border-amber-200 shadow-inner"
-                            }`}
+                            className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter border ${ticket.isCheckedIn
+                              ? "bg-gray-100 text-gray-400 border-gray-200"
+                              : "bg-yellow-50 text-yellow-600 border-yellow-200 shadow-inner"
+                              }`}
                           >
                             {ticket.isCheckedIn ? "✓ Used" : "Valid"}
                           </div>
@@ -393,8 +385,8 @@ export default function DashboardPage() {
 
                         <div className="mt-6 flex items-center justify-between">
                           <div className="flex -space-x-2">
-                            <div className="w-6 h-6 rounded-full border-2 border-white bg-amber-100" />
-                            <div className="w-6 h-6 rounded-full border-2 border-white bg-orange-100" />
+                            <div className="w-6 h-6 rounded-full border-2 border-white bg-yellow-200" />
+                            <div className="w-6 h-6 rounded-full border-2 border-white bg-yellow-100" />
                           </div>
                           <div className="flex gap-2">
                             {!ticket.isCheckedIn && (
@@ -404,7 +396,7 @@ export default function DashboardPage() {
                                     setSelectedTicket(ticket);
                                     setShowQrModal(true);
                                   }}
-                                  className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors"
+                                  className="p-2 rounded-xl bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors"
                                   title="Show Entry QR"
                                 >
                                   <svg
@@ -426,7 +418,7 @@ export default function DashboardPage() {
                                     setSelectedTicket(ticket);
                                     setShowTransferModal(true);
                                   }}
-                                  className="p-2 rounded-xl bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
+                                  className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                                   title="Transfer Ticket"
                                 >
                                   <svg
@@ -455,7 +447,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-white/50 border border-dashed border-amber-200 rounded-3xl p-10 text-center">
+                  <div className="bg-white border border-dashed border-yellow-200 rounded-3xl p-10 text-center">
                     <p className="text-gray-400 font-medium italic">
                       No active tickets found in your wallet.
                     </p>
@@ -467,30 +459,29 @@ export default function DashboardPage() {
             {/* ── RIGHT: SIDEBAR (STATS & FEED) ───────────────────────────────── */}
             <motion.div {...fadeUp(0.2)} className="lg:col-span-4 space-y-6">
               {/* Quick Access Card */}
-              <div className="bg-white border border-amber-100 rounded-3xl p-6 shadow-xl shadow-amber-900/5">
+              <div className="bg-white border border-yellow-100 rounded-3xl p-6 shadow-xl shadow-yellow-900/5">
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-4">
                   Quick Ecosystem
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                   <Link
                     href="/events"
-                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-amber-50 hover:bg-amber-100 transition-colors border border-amber-100"
+                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-yellow-50 hover:bg-yellow-100 transition-colors border border-yellow-100"
                   >
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-2 shadow-sm shadow-amber-500/10">
+                    <div className="w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center mb-2">
                       🎟️
                     </div>
-                    <span className="text-[10px] font-black text-amber-700 uppercase">
+                    <span className="text-[10px] font-black text-yellow-700 uppercase">
                       Buy Tickets
                     </span>
                   </Link>
                   <Link
                     href="/kyc"
-                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-100"
+                    className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-100"
                   >
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mb-2 shadow-sm shadow-orange-500/10">
-                      🛡️
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
                     </div>
-                    <span className="text-[10px] font-black text-orange-700 uppercase">
+                    <span className="text-[10px] font-black text-gray-600 uppercase">
                       Verify KYC
                     </span>
                   </Link>
@@ -498,22 +489,22 @@ export default function DashboardPage() {
               </div>
 
               {/* Reputation Ledger */}
-              <div className="bg-white border border-amber-100 rounded-3xl overflow-hidden shadow-xl shadow-amber-900/5">
-                <div className="p-5 border-b border-amber-50 flex items-center justify-between bg-linear-to-r from-amber-50/50 to-transparent">
+              <div className="bg-white border border-yellow-100 rounded-3xl overflow-hidden shadow-xl shadow-yellow-900/5">
+                <div className="p-5 border-b border-yellow-50 flex items-center justify-between bg-yellow-50/50">
                   <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">
                     Reputation Ledger
                   </h3>
-                  <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
                 </div>
 
                 <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
                   {profile?.reputationHistory &&
-                  profile.reputationHistory.length > 0 ? (
-                    <div className="divide-y divide-amber-50">
+                    profile.reputationHistory.length > 0 ? (
+                    <div className="divide-y divide-yellow-50">
                       {profile.reputationHistory.map((log) => (
                         <div
                           key={log.id}
-                          className="p-4 hover:bg-amber-50/30 transition-colors"
+                          className="p-4 hover:bg-yellow-50/30 transition-colors"
                         >
                           <div className="flex items-center justify-between mb-1">
                             <p
@@ -523,7 +514,7 @@ export default function DashboardPage() {
                                 ? "Contribution"
                                 : "Infraction"}
                             </p>
-                            <span className="text-[10px] text-gray-300 font-mono">
+                            <span className="text-[10px] text-gray-400 font-mono">
                               {new Date(log.created_at).toLocaleDateString()}
                             </span>
                           </div>
@@ -547,7 +538,7 @@ export default function DashboardPage() {
                                 href={`https://testnet.monadscan.com/tx/${log.tx_hash}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[10px] font-bold text-amber-500 hover:underline"
+                                className="text-[10px] font-bold text-yellow-600 hover:underline"
                               >
                                 TX →
                               </a>
@@ -582,7 +573,7 @@ export default function DashboardPage() {
                 initial={{ scale: 0.9, opacity: 0, y: 20 }}
                 animate={{ scale: 1, opacity: 1, y: 0 }}
                 exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                className="bg-white rounded-[40px] max-w-sm w-full p-8 shadow-2xl relative border border-amber-100"
+                className="bg-white rounded-[40px] max-w-sm w-full p-8 shadow-2xl relative border border-yellow-100"
               >
                 <button
                   onClick={() => {
@@ -607,9 +598,9 @@ export default function DashboardPage() {
                 </button>
 
                 <div className="text-center mt-4">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 mb-4 border border-amber-100">
-                    <span className="h-1 w-1 rounded-full bg-amber-500" />
-                    <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-yellow-50 px-3 py-1 mb-4 border border-yellow-200">
+                    <span className="h-1 w-1 rounded-full bg-yellow-500" />
+                    <span className="text-[9px] font-black text-yellow-600 uppercase tracking-widest">
                       Entry Pass
                     </span>
                   </div>
@@ -620,7 +611,7 @@ export default function DashboardPage() {
                     Ticket #{selectedTicket.onChainId}
                   </p>
 
-                  <div className="bg-amber-50 p-6 rounded-[32px] border-2 border-dashed border-amber-200 mb-8">
+                  <div className="bg-yellow-50 p-6 rounded-[32px] border-2 border-dashed border-yellow-200 mb-8">
                     <img
                       src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${address}&color=ea580c`}
                       alt="QR Code"
@@ -629,8 +620,8 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-4 text-xs font-bold text-gray-500">
-                    <div className="flex items-center gap-3 justify-center text-amber-600">
-                      <span className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[10px]">
+                    <div className="flex items-center gap-3 justify-center text-yellow-600">
+                      <span className="w-5 h-5 rounded-full bg-yellow-100 flex items-center justify-center text-[10px]">
                         1
                       </span>
                       <span>Show at Entrance</span>
@@ -660,11 +651,11 @@ export default function DashboardPage() {
                 initial={{ scale: 0.9, y: 20 }}
                 animate={{ scale: 1, y: 0 }}
                 exit={{ scale: 0.9, y: 20 }}
-                className="bg-white rounded-[40px] max-w-md w-full p-8 shadow-2xl relative border border-amber-100"
+                className="bg-white rounded-[40px] max-w-md w-full p-8 shadow-2xl relative border border-yellow-100"
               >
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-                    Transfer <span className="text-amber-500">Asset</span>
+                    Transfer <span className="text-yellow-500">Asset</span>
                   </h2>
                   <button
                     onClick={() => {
@@ -692,8 +683,8 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">
+                  <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-4">
+                    <p className="text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-1">
                       Asset Information
                     </p>
                     <p className="text-sm font-bold text-gray-800">
@@ -704,9 +695,9 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  <div className="bg-linear-to-r from-orange-50 to-amber-50 border border-orange-100 rounded-2xl p-4 flex gap-4">
+                  <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex gap-4">
                     <div className="text-2xl">⚠️</div>
-                    <p className="text-[10px] font-bold text-orange-800 leading-relaxed uppercase">
+                    <p className="text-[10px] font-bold text-orange-700 leading-relaxed uppercase">
                       Warning: Recipients must have a valid RacePass Identity to
                       accept this ticket. Non-compliant wallets will be rejected
                       on-chain.
@@ -714,7 +705,7 @@ export default function DashboardPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
                       Recipient Address
                     </label>
                     <input
@@ -725,7 +716,7 @@ export default function DashboardPage() {
                         setTransferError("");
                       }}
                       placeholder="0x..."
-                      className="w-full rounded-2xl border-amber-100 shadow-inner bg-amber-50/30 focus:border-amber-500 focus:ring-amber-500 font-mono text-xs p-4 border"
+                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 text-gray-900 focus:border-yellow-400 focus:ring-yellow-400 font-mono text-xs p-4 outline-none"
                     />
                   </div>
 
@@ -738,11 +729,10 @@ export default function DashboardPage() {
                   <button
                     onClick={handleTransferTicket}
                     disabled={isTransferring || !transferRecipient.trim()}
-                    className={`w-full rounded-full py-4 text-sm font-black uppercase tracking-widest text-white shadow-xl transition-all ${
-                      isTransferring || !transferRecipient.trim()
-                        ? "bg-gray-200 cursor-not-allowed text-gray-400"
-                        : "bg-linear-to-r from-amber-500 to-orange-600 shadow-orange-500/20 hover:scale-[1.02]"
-                    }`}
+                    className={`w-full rounded-full py-4 text-sm font-black uppercase tracking-widest shadow-xl transition-all ${isTransferring || !transferRecipient.trim()
+                      ? "bg-gray-100 cursor-not-allowed text-gray-400"
+                      : "bg-yellow-400 text-black shadow-yellow-400/20 hover:scale-[1.02]"
+                      }`}
                   >
                     {isTransferring ? "Processing..." : "Confirm Transfer"}
                   </button>
