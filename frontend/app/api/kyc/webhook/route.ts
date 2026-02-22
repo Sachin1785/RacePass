@@ -1,82 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
 
 /**
- * Didit webhook endpoint
- * Receives verification results from Didit after user completes verification
+ * Create a Didit verification session
+ * This endpoint creates a session with the Didit API and returns the verification URL
  */
-export async function GET(request: NextRequest) {
-  // Return status or dummy data if someone tries to GET it in browser
-  return NextResponse.json({ 
-    message: 'Didit Webhook endpoint is active. Use POST for live updates.',
-    success: true 
-  });
-}
-
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
-    
-    // 📂 Log payload to file for debugging (so you don't lose it on crash)
-    const logFilePath = path.join(process.cwd(), 'didit-webhook-payloads.log');
-    const logEntry = JSON.stringify({
-      timestamp: new Date().toISOString(),
-      payload: data
-    }, null, 2) + '\n---\n';
-    fs.appendFileSync(logFilePath, logEntry);
+    const { user_id, callback_url } = await request.json();
 
-    const imageUrl = data.decision?.face_matches?.[0]?.target_image;
-    const sessionId = data.session_id || 'unknown-session';
+    const apiKey = process.env.DIDIT_API_KEY;
+    const workflowId = process.env.DIDIT_WORKFLOW_ID;
+    const apiEndpoint = process.env.DIDIT_API_ENDPOINT || 'https://verification.didit.me';
 
-    // 🛡️ Safe logging
-    console.log('Didit Webhook Received:', {
-      session_id: sessionId,
-      status: data.status,
-      timestamp: new Date().toISOString(),
-      image_url: imageUrl || 'No image available'
-    });
-
-    // 📸 Download and store the image
-    if (imageUrl) {
-      try {
-        const imageResponse = await fetch(imageUrl);
-        if (imageResponse.ok) {
-          const buffer = await imageResponse.arrayBuffer();
-          
-          // Use 'storage/kyc-images' folder
-          const storageDir = path.join(process.cwd(), 'storage', 'kyc-images');
-          
-          // Create directory if it doesn't exist
-          if (!fs.existsSync(storageDir)) {
-            fs.mkdirSync(storageDir, { recursive: true });
-          }
-
-          // Use session ID or UUID for unique filename
-          const fileName = `${sessionId}-${Date.now()}.jpg`;
-          const filePath = path.join(storageDir, fileName);
-          
-          fs.writeFileSync(filePath, Buffer.from(buffer));
-          console.log(`✅ KYC image stored successfully: ${filePath}`);
-        } else {
-          console.warn(`Failed to fetch image from URL: ${imageResponse.statusText}`);
-        }
-      } catch (imageError) {
-        console.error('Error saving KYC image:', imageError);
-      }
+    if (!apiKey) {
+      return NextResponse.json(
+        { success: false, error: 'DIDIT_API_KEY not configured' },
+        { status: 500 }
+      );
     }
 
-    // Here you would:
-    // 1. Validate the webhook signature (if Didit provides one)
-    // 2. Store the verification results in your database
-    // 3. Update user's KYC status
-    // 4. Trigger any post-verification actions
+    if (!workflowId) {
+      return NextResponse.json(
+        { success: false, error: 'DIDIT_WORKFLOW_ID not configured' },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ success: true, received: true });
+    // Create session with Didit API
+    const response = await fetch(`${apiEndpoint}/v3/session/`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        workflow_id: workflowId,
+        callback: callback_url || `${process.env.NEXTAUTH_URL || 'https://yourapp.com'}/api/kyc/webhook`,
+        vendor_data: user_id || 'anonymous',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Didit API Error:', response.status, errorText);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Didit API error: ${response.status} ${errorText}` 
+        },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    
+    console.log('Didit API Response:', JSON.stringify(data, null, 2));
+    
+    // Didit API may return different field names
+    const verificationUrl = data.verification_url || data.session_url || data.url;
+    
+    if (!verificationUrl) {
+      console.error('No verification URL in response. Available fields:', Object.keys(data));
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'No verification URL received from Didit API' 
+        },
+        { status: 500 }
+      );
+    }
+    
+    return NextResponse.json({
+      success: true,
+      session_id: data.session_id,
+      session_token: data.session_token,
+      verification_url: verificationUrl,
+      status: data.status,
+    });
+
   } catch (error) {
-    console.error('Webhook Error:', error);
+    console.error('KYC Session Creation Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Webhook processing failed' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Internal server error',
+      },
       { status: 500 }
     );
   }

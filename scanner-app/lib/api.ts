@@ -54,3 +54,17 @@ export async function checkInByAddress(address: string, eventName: string, reput
         body: JSON.stringify({ address, eventName, reputationValue }),
     });
 }
+
+/** Returns { success, hasEmbedding } — fast pre-check before opening face camera */
+export async function checkFaceEmbedding(address: string) {
+    return apiFetch(`/api/face/has-embedding/${address}`);
+}
+
+/** Sends a base64 frame to the backend and returns { success, isMatch, confidence, distance } */
+export async function verifyFace(address: string, liveImageBase64: string) {
+    return apiFetch('/api/face/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, liveImageBase64 }),
+    });
+}
