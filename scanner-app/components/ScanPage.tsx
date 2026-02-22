@@ -102,14 +102,14 @@ const DEFAULT_RESULT: ResultState = {
 
 interface FaceState {
     open: boolean;
-    phase: 'capture' | 'verifying' | 'done';
+    phase: 'choose' | 'camera' | 'upload' | 'verifying' | 'done';
     countdown: number;        // 3 → 0
     isMatch: boolean | null;
     confidence: string;
     error: string;
 }
 const DEFAULT_FACE: FaceState = {
-    open: false, phase: 'capture', countdown: 3,
+    open: false, phase: 'choose', countdown: 3,
     isMatch: null, confidence: '', error: '',
 };
 
@@ -135,44 +135,100 @@ function FaceCaptureModal({
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const [phase, setPhase] = useState<'capture' | 'verifying' | 'done'>('capture');
+    const [phase, setPhase] = useState<'choose' | 'camera' | 'upload' | 'verifying' | 'done'>('choose');
     const [countdown, setCountdown] = useState(3);
     const [isMatch, setIsMatch] = useState<boolean | null>(null);
     const [confidence, setConfidence] = useState('');
     const [errMsg, setErrMsg] = useState('');
+    const [selectedFileName, setSelectedFileName] = useState('');
 
-    // Start front camera on mount
+    // Cleanup on unmount
     useEffect(() => {
-        (async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-                    audio: false,
-                });
-                streamRef.current = stream;
-                if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
-                // Countdown then auto-capture
-                let c = 3;
-                setCountdown(c);
-                countdownRef.current = setInterval(() => {
-                    c--;
-                    setCountdown(c);
-                    if (c <= 0) {
-                        clearInterval(countdownRef.current!);
-                        captureAndVerify();
-                    }
-                }, 1000);
-            } catch (e: unknown) {
-                setErrMsg('Camera error: ' + (e instanceof Error ? e.message : 'Unknown'));
-            }
-        })();
         return () => {
             streamRef.current?.getTracks().forEach(t => t.stop());
             if (countdownRef.current) clearInterval(countdownRef.current);
         };
-    }, []); // eslint-disable-line
+    }, []);
+
+    // Start camera when user chooses camera option
+    async function startCamera() {
+        setPhase('camera');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'user', 
+                    width: { ideal: 1280, min: 640 }, 
+                    height: { ideal: 720, min: 480 } 
+                },
+                audio: false,
+            });
+            streamRef.current = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                await videoRef.current.play();
+            }
+            // Countdown then auto-capture
+            let c = 3;
+            setCountdown(c);
+            countdownRef.current = setInterval(() => {
+                c--;
+                setCountdown(c);
+                if (c <= 0) {
+                    clearInterval(countdownRef.current!);
+                    captureAndVerify();
+                }
+            }, 1000);
+        } catch (e: unknown) {
+            setErrMsg('Camera error: ' + (e instanceof Error ? e.message : 'Unknown'));
+            setPhase('done');
+        }
+    }
+
+    function chooseFileUpload() {
+        setPhase('upload');
+    }
+
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setSelectedFileName(file.name);
+        
+        // Read file and convert to base64
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            const dataUrl = event.target?.result as string;
+            if (!dataUrl) return;
+            
+            setPhase('verifying');
+            try {
+                // Send full data URL (backend will strip the prefix)
+                console.log(`📸 Uploaded file: ${file.name}, data URL length: ${dataUrl.length}`);
+                
+                const data = await verifyFace(address, dataUrl);
+                
+                if (!data.success && !('isMatch' in data)) {
+                    setErrMsg(data.error || 'Verification failed');
+                    console.error('❌ File upload verification failed:', data.error);
+                    setPhase('done');
+                    return;
+                }
+                setIsMatch(data.isMatch as boolean);
+                setConfidence(data.confidence as string);
+                setPhase('done');
+                onResult(data.isMatch as boolean, data.confidence as string);
+            } catch (e: unknown) {
+                const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+                setErrMsg(errorMsg);
+                console.error('❌ File upload error:', errorMsg);
+                setPhase('done');
+            }
+        };
+        reader.readAsDataURL(file);
+    }
 
     async function captureAndVerify() {
         setPhase('verifying');
@@ -198,24 +254,23 @@ function FaceCaptureModal({
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error('Canvas error');
 
-            // Draw un-mirrored (the CSS scaleX(-1) is cosmetic only; backend needs real orientation)
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-            ctx.restore();
+            // Draw the image normally (don't mirror it for face detection)
+            // The CSS mirror is just for preview, backend needs the actual orientation
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // Stop stream immediately after capture
             streamRef.current?.getTracks().forEach(t => t.stop());
 
             // Use PNG for lossless quality — face-api detects better than compressed JPEG
             const dataUrl = canvas.toDataURL('image/png');
-            const base64 = dataUrl.split(',')[1];
+            const base64 = dataUrl; // Send full data URL, backend will strip prefix
             console.log(`📸 Captured ${canvas.width}x${canvas.height} frame, base64 length: ${base64.length}`);
 
             const data = await verifyFace(address, base64);
 
             if (!data.success && !('isMatch' in data)) {
                 setErrMsg(data.error || 'Verification failed');
+                console.error('❌ Face verification failed:', data.error);
                 setPhase('done');
                 return;
             }
@@ -224,7 +279,9 @@ function FaceCaptureModal({
             setPhase('done');
             onResult(data.isMatch as boolean, data.confidence as string);
         } catch (e: unknown) {
-            setErrMsg(e instanceof Error ? e.message : 'Unknown error');
+            const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+            setErrMsg(errorMsg);
+            console.error('❌ Camera capture error:', errorMsg);
             setPhase('done');
         }
     }
@@ -251,13 +308,87 @@ function FaceCaptureModal({
                     Face Verification
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>
-                    {phase === 'capture' && `Hold still… ${countdown > 0 ? countdown : '📸'}`}
+                    {phase === 'choose' && 'Choose Verification Method'}
+                    {phase === 'camera' && `Hold still… ${countdown > 0 ? countdown : '📸'}`}
+                    {phase === 'upload' && 'Upload Photo'}
                     {phase === 'verifying' && 'Analysing…'}
                     {phase === 'done' && (errMsg ? 'Error' : isMatch ? '✅ Identity Matched' : '⚠️ Face Mismatch')}
                 </div>
 
+                {/* Choice Phase - Select Camera or File Upload */}
+                {phase === 'choose' && (
+                    <div style={{ marginBottom: 14 }}>
+                        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.65 }}>
+                            Choose how you want to verify your identity
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <button
+                                onClick={startCamera}
+                                style={{
+                                    padding: '16px 20px', fontSize: 14, fontWeight: 600,
+                                    background: 'var(--accent)', border: 'none', borderRadius: 12,
+                                    color: 'var(--foreground)', fontFamily: 'inherit', cursor: 'pointer',
+                                    boxShadow: '0 3px 14px rgba(245,197,24,0.40)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                }}
+                            >
+                                <span style={{ fontSize: 20 }}>📷</span>
+                                <span>Take a Selfie</span>
+                            </button>
+                            <button
+                                onClick={chooseFileUpload}
+                                style={{
+                                    padding: '16px 20px', fontSize: 14, fontWeight: 600,
+                                    background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12,
+                                    color: 'var(--foreground)', fontFamily: 'inherit', cursor: 'pointer',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                                }}
+                            >
+                                <span style={{ fontSize: 20 }}>📁</span>
+                                <span>Upload a Photo</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* File upload UI */}
+                {phase === 'upload' && (
+                    <div style={{ marginBottom: 14 }}>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            style={{ display: 'none' }}
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{
+                                width: '100%', padding: '40px 20px',
+                                background: 'var(--surface)', border: '2px dashed var(--border)',
+                                borderRadius: 16, cursor: 'pointer',
+                                fontFamily: 'inherit', fontSize: 14, color: 'var(--muted)',
+                            }}
+                        >
+                            {selectedFileName ? (
+                                <div>
+                                    <div style={{ fontSize: 32, marginBottom: 8 }}>📸</div>
+                                    <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>{selectedFileName}</div>
+                                    <div style={{ fontSize: 12, marginTop: 4 }}>Processing...</div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <div style={{ fontSize: 32, marginBottom: 8 }}>📁</div>
+                                    <div style={{ fontWeight: 600, color: 'var(--foreground)' }}>Choose a photo</div>
+                                    <div style={{ fontSize: 12, marginTop: 4 }}>JPG, PNG, or JPEG</div>
+                                </div>
+                            )}
+                        </button>
+                    </div>
+                )}
+
                 {/* Camera viewfinder */}
-                {phase === 'capture' && (
+                {phase === 'camera' && (
                     <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', aspectRatio: '4/3', background: '#111', marginBottom: 14 }}>
                         <video ref={videoRef} playsInline muted style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transform: 'scaleX(-1)' }} />
                         {/* Oval face guide */}
@@ -345,7 +476,7 @@ function FaceCaptureModal({
                             </button>
                         </>
                     )}
-                    {phase === 'capture' && (
+                    {(phase === 'choose' || phase === 'camera' || phase === 'upload') && (
                         <button onClick={onClose} style={{
                             padding: '9px 18px', background: 'var(--surface)',
                             border: '1px solid var(--border)', borderRadius: 11,
