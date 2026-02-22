@@ -158,10 +158,10 @@ function FaceCaptureModal({
         setPhase('camera');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    facingMode: 'user', 
-                    width: { ideal: 1280, min: 640 }, 
-                    height: { ideal: 720, min: 480 } 
+                video: {
+                    facingMode: 'user',
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 720, min: 480 }
                 },
                 audio: false,
             });
@@ -194,22 +194,22 @@ function FaceCaptureModal({
     function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
-        
+
         setSelectedFileName(file.name);
-        
+
         // Read file and convert to base64
         const reader = new FileReader();
         reader.onload = async (event) => {
             const dataUrl = event.target?.result as string;
             if (!dataUrl) return;
-            
+
             setPhase('verifying');
             try {
                 // Send full data URL (backend will strip the prefix)
                 console.log(`📸 Uploaded file: ${file.name}, data URL length: ${dataUrl.length}`);
-                
+
                 const data = await verifyFace(address, dataUrl);
-                
+
                 if (!data.success && !('isMatch' in data)) {
                     setErrMsg(data.error || 'Verification failed');
                     console.error('❌ File upload verification failed:', data.error);
@@ -577,7 +577,8 @@ export default function ScanPage({ events, onToast }: Props) {
             ]);
 
             if (faceD.success && faceD.hasEmbedding) {
-                // Has an embedding — hide the result card and open face modal
+                // Has an embedding — stop QR camera first so face modal can use the front camera
+                stopCamera();
                 setResult(DEFAULT_RESULT);
                 setFaceState({ ...DEFAULT_FACE, open: true });
                 // Store KYC result to use after face step
@@ -620,7 +621,11 @@ export default function ScanPage({ events, onToast }: Props) {
     function closeFaceModal() {
         setFaceState(DEFAULT_FACE);
         setResult(DEFAULT_RESULT);
-        setTimeout(() => { lockedRef.current = false; }, 1200);
+        // Restart QR scanner camera after face modal is dismissed
+        setTimeout(() => {
+            lockedRef.current = false;
+            startCamera();
+        }, 600);
     }
 
     async function doCheckin() {
