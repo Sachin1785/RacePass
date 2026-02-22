@@ -4,7 +4,51 @@ const cors = require("cors");
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
 const { Offchain, SchemaEncoder } = require("@ethereum-attestation-service/eas-sdk");
+const fs = require("fs");
+const path = require("path");
+const util = require("util");
 require("dotenv").config();
+
+// ── Face-API / TensorFlow setup ──────────────────────────────────────────────
+// Shim TextEncoder/Decoder for face-api internal dependencies
+if (typeof global.TextEncoder === "undefined") global.TextEncoder = util.TextEncoder;
+if (typeof global.TextDecoder === "undefined") global.TextDecoder = util.TextDecoder;
+
+const tf = require("@tensorflow/tfjs");
+require("@tensorflow/tfjs-backend-wasm");
+const faceapi = require("@vladmandic/face-api/dist/face-api.node-wasm.js");
+const canvas = require("@napi-rs/canvas");
+const { Canvas, Image, ImageData } = canvas;
+
+// Patch face-api to use node-canvas
+faceapi.env.monkeyPatch({
+    Canvas,
+    Image,
+    ImageData,
+    createCanvasElement: (w, h) => canvas.createCanvas(w || 1, h || 1),
+});
+
+let faceModelsLoaded = false;
+async function loadFaceModels() {
+    if (faceModelsLoaded) return;
+    try { await tf.ready(); } catch (e) { console.warn('tf.ready() warning:', e.message); }
+    const modelPath = path.join(__dirname, 'models');
+    if (!fs.existsSync(modelPath)) {
+        console.warn('⚠️  Face models not found at', modelPath, '— run download-models.js');
+        return;
+    }
+    try {
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath),
+            faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
+            faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath),
+        ]);
+        faceModelsLoaded = true;
+        console.log('✅ Face-API models loaded successfully');
+    } catch (err) {
+        console.error('❌ Failed to load face-api models:', err.message);
+    }
+}
 
 // BigInt serialization fix
 BigInt.prototype.toJSON = function () { return this.toString(); };
@@ -93,6 +137,22 @@ let db;
         console.error("image_url migration error:", error);
     }
 
+    // Migration: Add face_embedding and kyc_image_path columns to users table
+    try {
+        const usersInfo = await db.all("PRAGMA table_info(users)");
+        const hasFaceEmbedding = usersInfo.some(col => col.name === 'face_embedding');
+        const hasKycImagePath = usersInfo.some(col => col.name === 'kyc_image_path');
+        if (!hasFaceEmbedding) await db.run('ALTER TABLE users ADD COLUMN face_embedding TEXT');
+        if (!hasKycImagePath) await db.run('ALTER TABLE users ADD COLUMN kyc_image_path TEXT');
+        if (!hasFaceEmbedding || !hasKycImagePath)
+            console.log('Face-verification columns migrated.');
+    } catch (err) {
+        console.error('Face migration error:', err);
+    }
+
+    // Load face recognition models
+    await loadFaceModels();
+
     // Seed sample events if table is empty
     const eventCount = await db.get('SELECT COUNT(*) as count FROM events');
     if (eventCount.count === 0) {
@@ -133,8 +193,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // CONFIG
 const RPC_URL = process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz";
@@ -793,7 +853,76 @@ app.post("/api/events", async (req, res) => {
     }
 });
 
-// Update event (Admin endpoint)
+// ── FACE VERIFICATION ENDPOINTS ──────────────────────────────────────────────
+
+// Generate + store face embedding from a KYC image path
+app.post("/api/face/generate-embedding", async (req, res) => {
+    try {
+        const { imagePath, address } = req.body;
+        if (!faceModelsLoaded)
+            return res.status(503).json({ success: false, error: 'Face models not loaded. Run download-models.js first.' });
+        if (!imagePath || !address)
+            return res.status(400).json({ success: false, error: 'Missing imagePath or address' });
+
+        const img = await canvas.loadImage(imagePath);
+        const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+
+        if (!detection)
+            return res.json({ success: false, error: 'No face detected in image. Ensure KYC photo has a clear face.' });
+
+        const embedding = JSON.stringify(Array.from(detection.descriptor));
+        await db.run(
+            `INSERT INTO users (address, face_embedding, kyc_image_path)
+             VALUES (?, ?, ?)
+             ON CONFLICT(address) DO UPDATE SET
+                 face_embedding = excluded.face_embedding,
+                 kyc_image_path = excluded.kyc_image_path`,
+            [address.toLowerCase(), embedding, imagePath]
+        );
+        console.log(`✅ Face embedding stored for ${address}`);
+        res.json({ success: true, message: 'Face embedding generated and stored.', dimensions: detection.descriptor.length });
+    } catch (err) {
+        console.error('Face embedding error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Verify a live base64 photo against the stored embedding for a wallet
+app.post("/api/face/verify", async (req, res) => {
+    try {
+        const { address, liveImageBase64 } = req.body;
+        if (!faceModelsLoaded)
+            return res.status(503).json({ success: false, error: 'Face models not loaded.' });
+        if (!address || !liveImageBase64)
+            return res.status(400).json({ success: false, error: 'Missing address or liveImageBase64' });
+
+        const user = await db.get('SELECT face_embedding FROM users WHERE address = ?', [address.toLowerCase()]);
+        if (!user || !user.face_embedding)
+            return res.json({ success: false, error: 'No face embedding found for this wallet. Complete KYC first.' });
+
+        // Strip data-URL prefix if present
+        const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const img = await canvas.loadImage(buffer);
+
+        const liveDetection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+        if (!liveDetection)
+            return res.json({ success: false, error: 'No face detected in live photo. Ensure your face is clearly visible.' });
+
+        const storedEmbedding = new Float32Array(JSON.parse(user.face_embedding));
+        const distance = faceapi.euclideanDistance(storedEmbedding, liveDetection.descriptor);
+        const isMatch = distance < 0.6;           // face-api recommended threshold
+        const confidence = Math.max(0, (1 - distance) * 100).toFixed(1);
+
+        console.log(`🔍 Face verify ${address}: ${isMatch ? '✅ MATCH' : '❌ NO MATCH'} (dist=${distance.toFixed(3)}, conf=${confidence}%)`);
+        res.json({ success: true, isMatch, confidence: `${confidence}%`, distance: distance.toFixed(3), threshold: 0.6 });
+    } catch (err) {
+        console.error('Face verification error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ── UPDATE EVENT (Admin) ──────────────────────────────────────────────────────
 app.put("/api/events/:eventId", async (req, res) => {
     try {
         const { eventId } = req.params;
@@ -858,7 +987,99 @@ async function updateEventStats(eventId, field) {
     }
 }
 
+// ── FACE VERIFICATION ENDPOINTS ──────────────────────────────────────────────
+
+// Quick check: does this wallet have a stored face embedding?
+// Called by the scanner immediately after QR scan.
+app.get("/api/face/has-embedding/:address", async (req, res) => {
+    try {
+        const address = req.params.address.toLowerCase();
+        const user = await db.get(
+            'SELECT CASE WHEN face_embedding IS NOT NULL THEN 1 ELSE 0 END as has_embedding FROM users WHERE address = ?',
+            [address]
+        );
+        res.json({ success: true, hasEmbedding: !!(user && user.has_embedding) });
+    } catch (err) {
+        console.error('has-embedding error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Generate + store face embedding from a KYC image path
+app.post("/api/face/generate-embedding", async (req, res) => {
+    try {
+        const { imagePath, address } = req.body;
+        if (!faceModelsLoaded)
+            return res.status(503).json({ success: false, error: 'Face models not loaded. Run download-models.js first.' });
+        if (!imagePath || !address)
+            return res.status(400).json({ success: false, error: 'Missing imagePath or address' });
+
+        const img = await canvas.loadImage(imagePath);
+        const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+
+        if (!detection)
+            return res.json({ success: false, error: 'No face detected in image. Ensure KYC photo has a clear face.' });
+
+        const embedding = JSON.stringify(Array.from(detection.descriptor));
+        await db.run(
+            `INSERT INTO users (address, face_embedding, kyc_image_path)
+             VALUES (?, ?, ?)
+             ON CONFLICT(address) DO UPDATE SET
+                 face_embedding = excluded.face_embedding,
+                 kyc_image_path = excluded.kyc_image_path`,
+            [address.toLowerCase(), embedding, imagePath]
+        );
+        console.log(`✅ Face embedding stored for ${address}`);
+        res.json({ success: true, message: 'Face embedding generated and stored.', dimensions: detection.descriptor.length });
+    } catch (err) {
+        console.error('Face embedding error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// Verify a live base64 photo against the stored embedding for a wallet
+app.post("/api/face/verify", async (req, res) => {
+    try {
+        const { address, liveImageBase64 } = req.body;
+        if (!faceModelsLoaded)
+            return res.status(503).json({ success: false, error: 'Face models not loaded.' });
+        if (!address || !liveImageBase64)
+            return res.status(400).json({ success: false, error: 'Missing address or liveImageBase64' });
+
+        const user = await db.get('SELECT face_embedding FROM users WHERE address = ?', [address.toLowerCase()]);
+        if (!user || !user.face_embedding)
+            return res.json({ success: false, error: 'No face embedding found for this wallet. Complete KYC first.' });
+
+        // Strip data-URL prefix if present
+        const base64Data = liveImageBase64.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        const img = await canvas.loadImage(buffer);
+        console.log(`📷 Live image loaded: ${img.width}x${img.height}`);
+
+        // Lower minConfidence (0.3 instead of default 0.5) for real-world mobile frames
+        const liveDetection = await faceapi
+            .detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+        if (!liveDetection)
+            return res.json({ success: false, error: 'No face detected in live photo. Ensure your face is clearly visible and well-lit.' });
+
+
+        const storedEmbedding = new Float32Array(JSON.parse(user.face_embedding));
+        const distance = faceapi.euclideanDistance(storedEmbedding, liveDetection.descriptor);
+        const isMatch = distance < 0.6;           // face-api recommended threshold
+        const confidence = Math.max(0, (1 - distance) * 100).toFixed(1);
+
+        console.log(`🔍 Face verify ${address}: ${isMatch ? '✅ MATCH' : '❌ NO MATCH'} (dist=${distance.toFixed(3)}, conf=${confidence}%)`);
+        res.json({ success: true, isMatch, confidence: `${confidence}%`, distance: distance.toFixed(3), threshold: 0.6 });
+    } catch (err) {
+        console.error('Face verification error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
 const PORT = 3005;
 app.listen(PORT, () => {
     console.log(`RacePass Backend Test API running on port ${PORT}`);
 });
+

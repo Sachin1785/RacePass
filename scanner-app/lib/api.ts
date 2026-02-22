@@ -1,9 +1,9 @@
-// Base URL: set NEXT_PUBLIC_API_URL in .env.local to override the default ngrok address.
+// Base URL: set NEXT_PUBLIC_API_URL in .env.local to override the default localhost address.
 // Example .env.local:
-//   NEXT_PUBLIC_API_URL=https://your-new-url.ngrok-free.app
+//   NEXT_PUBLIC_API_URL=https://your-ngrok-url.ngrok-free.app
 export const API =
     process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ||
-    'https://unremarked-zonally-harold.ngrok-free.dev';
+    'http://localhost:3005';
 
 export const NGROK_HEADERS: Record<string, string> = {
     'ngrok-skip-browser-warning': 'true',
@@ -13,7 +13,8 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     const res = await fetch(`${API}${path}`, {
         ...options,
         headers: {
-            ...NGROK_HEADERS,
+            // Only add ngrok headers if using ngrok (not localhost)
+            ...(API.includes('ngrok') ? NGROK_HEADERS : {}),
             ...(options.headers || {}),
         },
     });
@@ -26,7 +27,7 @@ export async function checkAPIHealth(): Promise<boolean> {
         const timeout = setTimeout(() => controller.abort(), 4000);
         const res = await fetch(`${API}/api/events`, {
             signal: controller.signal,
-            headers: NGROK_HEADERS,
+            headers: API.includes('ngrok') ? NGROK_HEADERS : {},
         });
         clearTimeout(timeout);
         return res.ok;
@@ -52,5 +53,19 @@ export async function checkInByAddress(address: string, eventName: string, reput
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address, eventName, reputationValue }),
+    });
+}
+
+/** Returns { success, hasEmbedding } — fast pre-check before opening face camera */
+export async function checkFaceEmbedding(address: string) {
+    return apiFetch(`/api/face/has-embedding/${address}`);
+}
+
+/** Sends a base64 frame to the backend and returns { success, isMatch, confidence, distance } */
+export async function verifyFace(address: string, liveImageBase64: string) {
+    return apiFetch('/api/face/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, liveImageBase64 }),
     });
 }
