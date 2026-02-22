@@ -29,6 +29,7 @@ let db;
             description TEXT,
             price TEXT,
             image_emoji TEXT,
+            image_url TEXT,
             requires_kyc BOOLEAN DEFAULT 1,
             min_age INTEGER DEFAULT 18,
             min_reputation INTEGER DEFAULT 0,
@@ -66,21 +67,32 @@ let db;
         );
     `);
     console.log("SQLite Database initialized.");
-    
+
     // Migration: Add event_id column to tickets table if it doesn't exist
     try {
         const tableInfo = await db.all("PRAGMA table_info(tickets)");
         const hasEventId = tableInfo.some(col => col.name === 'event_id');
-        
         if (!hasEventId) {
             console.log("Migrating tickets table: adding event_id column...");
             await db.run('ALTER TABLE tickets ADD COLUMN event_id INTEGER REFERENCES events(event_id)');
-            console.log("Migration completed successfully.");
+            console.log("Migration completed.");
         }
     } catch (error) {
         console.error("Migration error:", error);
     }
-    
+    // Migration: Add image_url column to events table if it doesn't exist
+    try {
+        const eventsInfo = await db.all("PRAGMA table_info(events)");
+        const hasImageUrl = eventsInfo.some(col => col.name === 'image_url');
+        if (!hasImageUrl) {
+            console.log("Migrating events table: adding image_url column...");
+            await db.run('ALTER TABLE events ADD COLUMN image_url TEXT');
+            console.log("image_url migration completed.");
+        }
+    } catch (error) {
+        console.error("image_url migration error:", error);
+    }
+
     // Seed sample events if table is empty
     const eventCount = await db.get('SELECT COUNT(*) as count FROM events');
     if (eventCount.count === 0) {
@@ -108,12 +120,12 @@ app.use((req, res, next) => {
     if (req.headers['access-control-request-private-network']) {
         res.setHeader('Access-Control-Allow-Private-Network', 'true');
     }
-    
+
     // Allow all origins, methods, and headers for the hackathon
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type,Authorization');
-    
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With, content-type, Authorization, ngrok-skip-browser-warning');
+
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
@@ -121,7 +133,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // CONFIG
 const RPC_URL = process.env.MONAD_RPC_URL || "https://testnet-rpc.monad.xyz";
@@ -214,15 +227,15 @@ app.post("/api/attest/issue", async (req, res) => {
 app.get("/api/kyc/status/:address", async (req, res) => {
     try {
         const address = req.params.address.toLowerCase();
-        
+
         // Check if user exists in our local DB first
         const user = await db.get('SELECT * FROM users WHERE address = ?', [address]);
-        
+
         if (!user || !user.token_id) {
-            return res.json({ 
-                success: true, 
-                isVerified: false, 
-                message: "No RacePass identity found for this wallet." 
+            return res.json({
+                success: true,
+                isVerified: false,
+                message: "No RacePass identity found for this wallet."
             });
         }
 
@@ -321,11 +334,11 @@ app.post("/api/identity/issue", async (req, res) => {
         // Check if user already exists to prevent duplicate minting
         const existingUser = await db.get('SELECT * FROM users WHERE address = ?', [address.toLowerCase()]);
         if (existingUser && existingUser.token_id && existingUser.token_id !== "Unknown") {
-            return res.json({ 
-                success: true, 
-                message: "Identity already exists", 
+            return res.json({
+                success: true,
+                message: "Identity already exists",
                 tokenId: existingUser.token_id,
-                alreadyIssued: true 
+                alreadyIssued: true
             });
         }
 
@@ -417,7 +430,7 @@ app.post("/api/tickets/mint", async (req, res) => {
             if (!event) {
                 return res.status(404).json({ success: false, error: "Event not found" });
             }
-            
+
             // Check if event is sold out
             if (event.tickets_minted >= event.max_tickets) {
                 return res.status(400).json({ success: false, error: "Event is sold out" });
@@ -665,6 +678,7 @@ app.get("/api/events", async (req, res) => {
                 description,
                 price,
                 image_emoji as image,
+                image_url as imageUrl,
                 requires_kyc as requiresKyc,
                 min_age as minAge,
                 min_reputation as minReputation,
@@ -687,7 +701,7 @@ app.get("/api/events", async (req, res) => {
 app.get("/api/events/:eventId", async (req, res) => {
     try {
         const { eventId } = req.params;
-        
+
         const event = await db.get(`
             SELECT 
                 event_id as id,
@@ -697,6 +711,7 @@ app.get("/api/events/:eventId", async (req, res) => {
                 description,
                 price,
                 image_emoji as image,
+                image_url as imageUrl,
                 requires_kyc as requiresKyc,
                 min_age as minAge,
                 min_reputation as minReputation,
@@ -721,8 +736,8 @@ app.get("/api/events/:eventId", async (req, res) => {
             ORDER BY t.minted_at DESC
         `, [eventId]);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             event,
             attendees,
             stats: {
@@ -738,15 +753,17 @@ app.get("/api/events/:eventId", async (req, res) => {
 });
 
 // Create new event (Admin endpoint)
+// Accepts imageUrl as a base64 data URL for the event cover image
 app.post("/api/events", async (req, res) => {
     try {
-        const { 
-            name, 
-            date, 
-            location, 
-            description, 
-            price, 
+        const {
+            name,
+            date,
+            location,
+            description,
+            price,
             imageEmoji = '🎫',
+            imageUrl = null,
             requiresKyc = true,
             minAge = 18,
             minReputation = 0,
@@ -754,22 +771,78 @@ app.post("/api/events", async (req, res) => {
         } = req.body;
 
         if (!name || !date || !location) {
-            return res.status(400).json({ 
-                success: false, 
-                error: "Missing required fields: name, date, location" 
+            return res.status(400).json({
+                success: false,
+                error: "Missing required fields: name, date, location"
             });
         }
 
         const result = await db.run(`
-            INSERT INTO events (name, date, location, description, price, image_emoji, requires_kyc, min_age, min_reputation, max_tickets)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `, [name, date, location, description, price, imageEmoji, requiresKyc ? 1 : 0, minAge, minReputation, maxTickets]);
+            INSERT INTO events (name, date, location, description, price, image_emoji, image_url, requires_kyc, min_age, min_reputation, max_tickets)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [name, date, location, description, price, imageEmoji, imageUrl, requiresKyc ? 1 : 0, minAge, minReputation, maxTickets]);
 
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             eventId: result.lastID,
-            message: "Event created successfully" 
+            message: "Event created successfully"
         });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Update event (Admin endpoint)
+app.put("/api/events/:eventId", async (req, res) => {
+    try {
+        const { eventId } = req.params;
+        const {
+            name,
+            date,
+            location,
+            description,
+            price,
+            imageEmoji,
+            imageUrl,          // base64 data URL or null to clear
+            requiresKyc,
+            minAge,
+            minReputation,
+            maxTickets,
+            isActive
+        } = req.body;
+
+        // Confirm event exists
+        const existing = await db.get('SELECT event_id FROM events WHERE event_id = ?', [eventId]);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: "Event not found" });
+        }
+
+        await db.run(`
+            UPDATE events SET
+                name            = COALESCE(?, name),
+                date            = COALESCE(?, date),
+                location        = COALESCE(?, location),
+                description     = COALESCE(?, description),
+                price           = COALESCE(?, price),
+                image_emoji     = COALESCE(?, image_emoji),
+                image_url       = ?,
+                requires_kyc    = COALESCE(?, requires_kyc),
+                min_age         = COALESCE(?, min_age),
+                min_reputation  = COALESCE(?, min_reputation),
+                max_tickets     = COALESCE(?, max_tickets),
+                is_active       = COALESCE(?, is_active)
+            WHERE event_id = ?
+        `, [
+            name, date, location, description, price, imageEmoji,
+            imageUrl !== undefined ? imageUrl : null,   // explicit null clears image
+            requiresKyc !== undefined ? (requiresKyc ? 1 : 0) : null,
+            minAge, minReputation, maxTickets,
+            isActive !== undefined ? (isActive ? 1 : 0) : null,
+            eventId
+        ]);
+
+        res.json({ success: true, message: "Event updated successfully" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ success: false, error: error.message });

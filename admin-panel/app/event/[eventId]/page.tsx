@@ -38,16 +38,14 @@ interface Stats {
 export default function EventDetailsPage() {
   const params = useParams();
   const eventId = params.eventId as string;
-  
+
   const [event, setEvent] = useState<Event | null>(null);
   const [attendees, setAttendees] = useState<Attendee[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (eventId) {
-      fetchEventDetails();
-    }
+    if (eventId) fetchEventDetails();
   }, [eventId]);
 
   const fetchEventDetails = async () => {
@@ -68,18 +66,26 @@ export default function EventDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading event details...</div>
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-10 h-10 rounded-full border-4 border-yellow-400 border-t-transparent animate-spin mb-3" />
+          <p className="text-sm text-gray-400">Loading event details…</p>
+        </div>
       </div>
     );
   }
 
   if (!event) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Event Not Found</h2>
-          <Link href="/" className="text-blue-600 hover:text-blue-800">
+          <div className="text-5xl mb-4">🎟️</div>
+          <h2 className="text-2xl font-black text-gray-900 mb-2">Event Not Found</h2>
+          <p className="text-sm text-gray-400 mb-6">This event doesn't exist or has been removed.</p>
+          <Link
+            href="/"
+            className="rounded-xl bg-yellow-400 hover:bg-yellow-300 px-6 py-2.5 text-sm font-bold text-black transition-all"
+          >
             ← Back to Dashboard
           </Link>
         </div>
@@ -87,153 +93,202 @@ export default function EventDetailsPage() {
     );
   }
 
+  const fillPct = Math.min(100, (event.ticketsMinted / event.maxTickets) * 100);
+  const checkinPct = event.ticketsMinted > 0
+    ? Math.min(100, (event.ticketsCheckedIn / event.ticketsMinted) * 100)
+    : 0;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <Link href="/" className="text-blue-600 hover:text-blue-800 text-sm font-medium mb-2 inline-block">
+    <div className="min-h-screen bg-white font-sans">
+      {/* ── PAGE HEADER ─────────────────────────────────────────────────────── */}
+      <div
+        className="relative overflow-hidden border-b border-gray-100"
+        style={{
+          backgroundImage: 'radial-gradient(circle at 1px 1px, #f5c51820 1px, transparent 0)',
+          backgroundSize: '32px 32px',
+        }}
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1 text-xs font-semibold text-yellow-600 hover:text-yellow-700 mb-4 transition-colors"
+          >
             ← Back to Dashboard
           </Link>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="text-5xl mr-4">{event.image}</div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="text-5xl">{event.image}</div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{event.name}</h1>
-                <p className="mt-1 text-sm text-gray-600">{event.location}</p>
+                <div className="inline-flex items-center gap-2 rounded-full border border-yellow-400/50 bg-yellow-50 px-3 py-1 mb-2">
+                  <span className={`h-1.5 w-1.5 rounded-full ${event.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+                  <span className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest">
+                    {event.isActive ? 'Active Event' : 'Inactive Event'}
+                  </span>
+                </div>
+                <h1 className="text-3xl font-black text-gray-900">{event.name}</h1>
+                <p className="mt-0.5 text-sm text-gray-500">{event.location}</p>
               </div>
             </div>
-            <Link
-              href={`/scanner?eventId=${event.id}&eventName=${encodeURIComponent(event.name)}`}
-              className="rounded-lg bg-purple-600 px-6 py-3 text-sm font-semibold text-white hover:bg-purple-500"
-            >
-              📱 Open Gate Scanner
-            </Link>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Event Info Card */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Event Details</h3>
-              <dl className="mt-4 space-y-3">
-                <div>
-                  <dt className="text-sm text-gray-500">Date</dt>
-                  <dd className="text-sm font-medium text-gray-900">
-                    {new Date(event.date).toLocaleDateString('en-US', { 
-                      weekday: 'long',
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-gray-500">Description</dt>
-                  <dd className="text-sm font-medium text-gray-900">{event.description}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm text-gray-500">Price</dt>
-                  <dd className="text-sm font-medium text-gray-900">{event.price}</dd>
-                </div>
-              </dl>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Requirements</h3>
-              <dl className="mt-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                    event.requiresKyc ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {event.requiresKyc ? '✓ KYC Required' : 'No KYC Required'}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        {/* ── EVENT INFO CARD ──────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
+          {/* Details */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-300 transition-colors duration-200">
+            <h3 className="text-xs font-bold text-yellow-600 uppercase tracking-widest mb-4">
+              Event Details
+            </h3>
+            <dl className="space-y-4">
+              <div>
+                <dt className="text-xs text-gray-400 font-medium mb-0.5">Date</dt>
+                <dd className="text-sm font-semibold text-gray-900">
+                  {new Date(event.date).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 font-medium mb-0.5">Description</dt>
+                <dd className="text-sm text-gray-700 leading-relaxed">{event.description || '—'}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400 font-medium mb-0.5">Ticket Price</dt>
+                <dd className="text-sm font-bold text-gray-900">{event.price}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Requirements */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-300 transition-colors duration-200">
+            <h3 className="text-xs font-bold text-yellow-600 uppercase tracking-widest mb-4">
+              Access Requirements
+            </h3>
+            <div className="space-y-3">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${event.requiresKyc
+                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+                  }`}
+              >
+                {event.requiresKyc ? '✓' : '✗'} KYC {event.requiresKyc ? 'Required' : 'Not Required'}
+              </span>
+              <br />
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-200">
+                🎂 {event.minAge}+ Age Requirement
+              </span>
+              {event.minReputation > 0 && (
+                <>
+                  <br />
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-yellow-50 text-yellow-800 border border-yellow-200">
+                    ⭐ {event.minReputation}+ Reputation Required
                   </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                    {event.minAge}+ Age Requirement
-                  </span>
-                </div>
-                {event.minReputation > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      {event.minReputation}+ Reputation Required
-                    </span>
-                  </div>
-                )}
-              </dl>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Tickets Sold</div>
-            <div className="mt-2 text-3xl font-bold text-blue-600">
-              {event.ticketsMinted} / {event.maxTickets}
+        {/* ── STATS CARDS ──────────────────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+          {/* Tickets Sold */}
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-400 hover:shadow-lg hover:shadow-yellow-400/10 transition-all duration-300 hover:-translate-y-1">
+            <div className="text-sm font-medium text-gray-500 mb-1">Tickets Sold</div>
+            <div className="text-3xl font-black text-yellow-500 mb-1">
+              {event.ticketsMinted}
+              <span className="text-base font-semibold text-gray-400"> / {event.maxTickets}</span>
             </div>
-            <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-blue-600 h-2 rounded-full" 
-                style={{ width: `${(event.ticketsMinted / event.maxTickets) * 100}%` }}
-              ></div>
+            <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
+              <div
+                className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${fillPct}%` }}
+              />
             </div>
+            <div className="text-xs text-gray-400 mt-1">{fillPct.toFixed(0)}% capacity filled</div>
+            <div className="absolute bottom-0 left-6 right-6 h-0.5 bg-yellow-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 rounded-full" />
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Total Check-Ins</div>
-            <div className="mt-2 text-3xl font-bold text-green-600">{event.ticketsCheckedIn}</div>
-            <div className="mt-2 text-sm text-gray-500">
-              {stats && `${stats.attendanceRate}% attendance rate`}
+
+          {/* Check-Ins */}
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-400 hover:shadow-lg hover:shadow-yellow-400/10 transition-all duration-300 hover:-translate-y-1">
+            <div className="text-sm font-medium text-gray-500 mb-1">Total Check-Ins</div>
+            <div className="text-3xl font-black text-yellow-500 mb-1">{event.ticketsCheckedIn}</div>
+            <div className="w-full bg-gray-100 rounded-full h-2 mt-3">
+              <div
+                className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${checkinPct}%` }}
+              />
             </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {stats ? `${stats.attendanceRate}% attendance rate` : '—'}
+            </div>
+            <div className="absolute bottom-0 left-6 right-6 h-0.5 bg-yellow-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 rounded-full" />
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Remaining</div>
-            <div className="mt-2 text-3xl font-bold text-purple-600">
+
+          {/* Remaining */}
+          <div className="group relative rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-400 hover:shadow-lg hover:shadow-yellow-400/10 transition-all duration-300 hover:-translate-y-1">
+            <div className="text-sm font-medium text-gray-500 mb-1">Remaining</div>
+            <div className="text-3xl font-black text-gray-900 mb-1">
               {event.maxTickets - event.ticketsMinted}
             </div>
-            <div className="mt-2 text-sm text-gray-500">tickets available</div>
+            <div className="text-xs text-gray-400 mt-4">tickets still available</div>
+            {event.ticketsMinted >= event.maxTickets && (
+              <span className="inline-flex items-center mt-2 px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                Sold Out
+              </span>
+            )}
+            <div className="absolute bottom-0 left-6 right-6 h-0.5 bg-yellow-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 rounded-full" />
           </div>
         </div>
 
-        {/* Attendees List */}
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Ticket Holders ({attendees.length})
-            </h2>
+        {/* ── ATTENDEES TABLE ──────────────────────────────────────────────────── */}
+        <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-base font-black text-gray-900">Ticket Holders</h2>
+            <span className="text-xs font-semibold text-gray-400 bg-gray-100 rounded-full px-3 py-1">
+              {attendees.length} holders
+            </span>
           </div>
+
           {attendees.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No tickets minted yet.
+            <div className="p-12 text-center">
+              <div className="w-14 h-14 rounded-full bg-yellow-50 border border-yellow-200 flex items-center justify-center mx-auto mb-4 text-2xl">
+                👤
+              </div>
+              <p className="text-sm font-semibold text-gray-600">No tickets minted yet</p>
+              <p className="text-xs text-gray-400 mt-1">Attendees will appear here once tickets are sold.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Wallet Address
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
                       Minted At
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                    <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Explorer
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-50">
                   {attendees.map((attendee) => (
-                    <tr key={attendee.owner_address}>
+                    <tr
+                      key={attendee.owner_address}
+                      className="hover:bg-yellow-50/40 transition-colors duration-150"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <code className="text-sm text-gray-900 bg-gray-100 px-2 py-1 rounded">
-                            {attendee.owner_address.slice(0, 6)}...{attendee.owner_address.slice(-4)}
-                          </code>
-                        </div>
+                        <code className="text-sm text-gray-800 bg-gray-100 px-3 py-1.5 rounded-lg font-mono">
+                          {attendee.owner_address.slice(0, 6)}…{attendee.owner_address.slice(-4)}
+                        </code>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(attendee.minted_at).toLocaleString('en-US', {
@@ -241,7 +296,7 @@ export default function EventDetailsPage() {
                           day: 'numeric',
                           year: 'numeric',
                           hour: '2-digit',
-                          minute: '2-digit'
+                          minute: '2-digit',
                         })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -249,7 +304,7 @@ export default function EventDetailsPage() {
                           href={`https://testnet.monadscan.com/address/${attendee.owner_address}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-900"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white hover:border-yellow-400 hover:bg-yellow-50 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-all duration-200"
                         >
                           View on Explorer →
                         </a>
@@ -261,7 +316,7 @@ export default function EventDetailsPage() {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </div>
   );
 }

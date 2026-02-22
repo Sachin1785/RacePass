@@ -61,8 +61,8 @@ export function Sidebar() {
     <aside className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
       <div className="flex grow flex-col gap-y-2 overflow-y-auto bg-white border-r border-gray-200 px-5 pb-6 pt-6">
         {/* Logo */}
-        <div className="flex items-center gap-2 mb-6">
-          <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shadow-sm">
+        <Link href="/" className="flex items-center gap-2 mb-6 group">
+          <div className="w-9 h-9 rounded-xl bg-yellow-400 flex items-center justify-center shadow-sm group-hover:shadow-yellow-400/40 transition-shadow">
             <span className="text-black font-black text-base">R</span>
           </div>
           <div>
@@ -73,7 +73,7 @@ export function Sidebar() {
               Web3 Racing ID
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Navigation */}
         <nav className="flex flex-col gap-1">

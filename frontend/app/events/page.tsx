@@ -15,7 +15,8 @@ interface Event {
   location: string;
   description: string;
   price: string;
-  image: string;
+  image: string;        // emoji fallback
+  imageUrl?: string;    // uploaded cover image
   requiresKyc: boolean;
   minAge: number;
   minReputation: number;
@@ -181,9 +182,27 @@ export default function EventsPage() {
                     className="group relative flex flex-col bg-white rounded-3xl border border-yellow-100 overflow-hidden hover:shadow-2xl hover:shadow-yellow-400/10 transition-all duration-500"
                   >
                     {/* Visual Header */}
-                    <div className="relative h-56 bg-linear-to-br from-yellow-100 to-yellow-50 flex items-center justify-center overflow-hidden">
-                      <div className="absolute inset-0 opacity-10 group-hover:scale-110 transition-transform duration-700 pointer-events-none"
-                        style={{ backgroundImage: 'radial-gradient(circle at center, #facc15 2px, transparent 0)', backgroundSize: '16px 16px' }} />
+                    <div className="relative h-56 overflow-hidden flex items-center justify-center">
+                      {event.imageUrl ? (
+                        /* Uploaded cover photo */
+                        <img
+                          src={event.imageUrl}
+                          alt={event.name}
+                          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                        />
+                      ) : (
+                        /* Fallback: gradient + dot grid + emoji */
+                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-100 to-yellow-50">
+                          <div className="absolute inset-0 opacity-10 group-hover:scale-110 transition-transform duration-700 pointer-events-none"
+                            style={{ backgroundImage: 'radial-gradient(circle at center, #facc15 2px, transparent 0)', backgroundSize: '16px 16px' }} />
+                          <div className="absolute inset-0 flex items-center justify-center text-6xl select-none">
+                            {event.image}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Gradient scrim so overlay badges are always readable */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent pointer-events-none" />
 
                       {/* Overlay Status */}
                       <div className="absolute top-5 left-5 right-5 flex justify-between items-start pointer-events-none">

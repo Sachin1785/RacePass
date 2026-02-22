@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const { address, isConnected, isConnecting } = useAccount();
   const [isClient, setIsClient] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
+  const [showIdentityQrModal, setShowIdentityQrModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const router = useRouter();
 
@@ -277,13 +278,21 @@ export default function DashboardPage() {
                         </p>
                       </div>
 
-                      <div className="mt-8 md:mt-0 p-3 bg-white rounded-2xl shadow-inner shadow-black/5">
+                      {/* Clickable QR — opens fullscreen modal */}
+                      <button
+                        onClick={() => setShowIdentityQrModal(true)}
+                        className="mt-8 md:mt-0 p-3 bg-white rounded-2xl shadow-inner shadow-black/5 cursor-zoom-in hover:scale-105 hover:shadow-md transition-all duration-300 group/qr relative"
+                        title="Click to enlarge QR"
+                      >
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${address}&color=ea580c`}
                           alt="Identity QR"
-                          className="w-20 h-20 grayscale brightness-90 hover:grayscale-0 transition-all duration-300"
+                          className="w-20 h-20 grayscale brightness-90 group-hover/qr:grayscale-0 transition-all duration-300"
                         />
-                      </div>
+                        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-white/60 whitespace-nowrap opacity-0 group-hover/qr:opacity-100 transition-opacity">
+                          Tap to enlarge
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -560,7 +569,62 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── MODALS ────────────────────────────────────────── */}
+        {/* ── IDENTITY QR MODAL ─────────────────────────────────────────── */}
+        <AnimatePresence>
+          {showIdentityQrModal && address && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowIdentityQrModal(false)}
+              className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 z-50 cursor-pointer"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0, y: 24 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.85, opacity: 0, y: 16 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                onClick={e => e.stopPropagation()}
+                className="bg-white rounded-[40px] max-w-xs w-full p-8 shadow-2xl relative border border-yellow-100 text-center"
+              >
+                {/* Close */}
+                <button
+                  onClick={() => setShowIdentityQrModal(false)}
+                  className="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                {/* Badge */}
+                <div className="inline-flex items-center gap-2 rounded-full bg-yellow-50 border border-yellow-200 px-3 py-1 mb-5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 animate-pulse" />
+                  <span className="text-[9px] font-black text-yellow-600 uppercase tracking-widest">RacePass Identity</span>
+                </div>
+
+                {/* Large QR */}
+                <div className="bg-yellow-50 p-6 rounded-[28px] border-2 border-dashed border-yellow-200 mb-6 inline-block">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${address}&color=111111&bgcolor=fefce8`}
+                    alt="Identity QR — enlarged"
+                    className="w-56 h-56 mx-auto"
+                  />
+                </div>
+
+                {/* Wallet address */}
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Wallet Address</p>
+                <p className="text-xs font-mono text-gray-700 break-all leading-relaxed">{address}</p>
+
+                <p className="mt-5 text-[10px] text-gray-300 font-medium">
+                  Show this QR at the event entrance
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── TICKET QR MODAL ───────────────────────────────────────────────── */}
         <AnimatePresence>
           {showQrModal && selectedTicket && (
             <motion.div
