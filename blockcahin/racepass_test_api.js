@@ -1078,6 +1078,35 @@ app.post("/api/face/verify", async (req, res) => {
     }
 });
 
+// --- LEADERBOARD ENDPOINT ---
+app.get("/api/leaderboard", async (req, res) => {
+    try {
+        const users = await db.all('SELECT address, token_id FROM users WHERE token_id IS NOT NULL AND token_id != "Unknown"');
+
+        const leaderboard = await Promise.all(users.map(async (u) => {
+            try {
+                const score = await identityContract.getActiveReputation(u.token_id);
+                return {
+                    address: u.address,
+                    tokenId: u.token_id,
+                    reputation: Number(score)
+                };
+            } catch (e) {
+                return { address: u.address, tokenId: u.token_id, reputation: 0 };
+            }
+        }));
+
+        // Sort by reputation descending and take top 10
+        leaderboard.sort((a, b) => b.reputation - a.reputation);
+        const top10 = leaderboard.slice(0, 10);
+
+        res.json({ success: true, leaderboard: top10 });
+    } catch (error) {
+        console.error("Leaderboard Error:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 const PORT = 3005;
 app.listen(PORT, () => {
     console.log(`RacePass Backend Test API running on port ${PORT}`);

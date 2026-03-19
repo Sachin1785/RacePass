@@ -85,6 +85,17 @@ export default function CredentialsPage() {
         alert('Attestation copied to clipboard! You can share this for off-chain verification.');
     };
 
+    const handleExportAttestation = (attestation: Attestation) => {
+        const data = JSON.stringify(attestation.payload, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${attestation.eventName.replace(/\s+/g, '_')}_${attestation.uid.slice(0, 8)}.racepass`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const toggleCredentialSelection = (uid: string) => {
         const newSelection = new Set(selectedCredentials);
         if (newSelection.has(uid)) { newSelection.delete(uid); } else { newSelection.add(uid); }
@@ -99,9 +110,9 @@ export default function CredentialsPage() {
         setShowPresentationModal(true);
     };
 
-    const handleCopyPresentation = () => {
+    const buildPresentation = () => {
         const selectedAttestations = attestations.filter(a => selectedCredentials.has(a.uid));
-        const presentation = {
+        return {
             version: '1.0',
             issuer: 'RacePass Platform',
             issuedAt: new Date().toISOString(),
@@ -114,8 +125,25 @@ export default function CredentialsPage() {
                 payload: a.payload
             }))
         };
-        navigator.clipboard.writeText(JSON.stringify(presentation, null, 2));
+    };
+
+    const handleCopyPresentation = () => {
+        navigator.clipboard.writeText(JSON.stringify(buildPresentation(), null, 2));
         alert('Presentation bundle copied to clipboard!');
+        setShowPresentationModal(false);
+        setIsSelectionMode(false);
+        setSelectedCredentials(new Set());
+    };
+
+    const handleDownloadPresentation = () => {
+        const presentation = buildPresentation();
+        const blob = new Blob([JSON.stringify(presentation, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `racepass_bundle_${Date.now()}.racepass`;
+        a.click();
+        URL.revokeObjectURL(url);
         setShowPresentationModal(false);
         setIsSelectionMode(false);
         setSelectedCredentials(new Set());
@@ -223,9 +251,14 @@ export default function CredentialsPage() {
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                                     </svg>
                                                 </button>
-                                                <button onClick={(e) => { e.stopPropagation(); handleCopyAttestation(att); }} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 active:scale-95 transition-all" title="Copy to Clipboard">
+                                                <button onClick={(e) => { e.stopPropagation(); handleCopyAttestation(att); }} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 active:scale-95 transition-all" title="Copy JSON to Clipboard">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                                    </svg>
+                                                </button>
+                                                <button onClick={(e) => { e.stopPropagation(); handleExportAttestation(att); }} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:bg-yellow-50 hover:text-yellow-600 active:scale-95 transition-all" title="Export as .racepass file">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                                     </svg>
                                                 </button>
                                             </div>
@@ -334,8 +367,13 @@ export default function CredentialsPage() {
                                         </p>
 
                                         <div className="space-y-3 mb-8">
-                                            <button onClick={handleCopyPresentation} className="w-full py-5 bg-yellow-400 text-black rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-yellow-400/20 hover:scale-[1.02] hover:bg-yellow-300 transition-all">
-                                                Bundle and Copy to Clipboard
+                                            <button onClick={handleDownloadPresentation} className="w-full py-5 bg-yellow-400 text-black rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-yellow-400/20 hover:scale-[1.02] hover:bg-yellow-300 transition-all flex items-center justify-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                Download as .racepass
+                                            </button>
+                                            <button onClick={handleCopyPresentation} className="w-full py-5 bg-gray-100 text-gray-700 rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors flex items-center justify-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
+                                                Copy JSON to Clipboard
                                             </button>
                                             <button onClick={() => setShowPresentationModal(false)} className="w-full py-5 bg-gray-50 text-gray-400 rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors">
                                                 Cancel Build

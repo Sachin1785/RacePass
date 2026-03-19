@@ -23,6 +23,12 @@ interface Event {
   isActive: boolean;
 }
 
+interface LeaderboardEntry {
+  address: string;
+  tokenId: string;
+  reputation: number;
+}
+
 interface EditForm {
   name: string;
   date: string;
@@ -138,6 +144,52 @@ function KycPieChart({ events }: { events: Event[] }) {
         <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 rounded-full bg-gray-200 inline-block" /><span className="text-xs text-gray-600 font-semibold">Open Access</span><span className="ml-auto text-xs font-black text-gray-900">{total - kyc}</span></div>
         <div className="pt-1 border-t border-gray-100"><span className="text-[10px] text-gray-400">{total > 0 ? ((kyc / total) * 100).toFixed(0) : 0}% require KYC</span></div>
       </div>
+    </div>
+  );
+}
+
+function ReputationLeaderboard({ entries, isLoading }: { entries: LeaderboardEntry[]; isLoading: boolean }) {
+  if (isLoading) return <div className="h-44 flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-yellow-400 border-t-transparent animate-spin" /></div>;
+  if (entries.length === 0) return <div className="h-44 flex items-center justify-center text-sm text-gray-400">No reputation data yet</div>;
+
+  const maxRep = Math.max(...entries.map(e => e.reputation), 1);
+
+  return (
+    <div className="h-44 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+      {entries.map((user, i) => (
+        <div key={user.address} className="flex items-center gap-3">
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${i === 0 ? 'bg-yellow-400 text-black' : i === 1 ? 'bg-gray-200 text-gray-700' : i === 2 ? 'bg-orange-100 text-orange-700' : 'bg-gray-50 text-gray-400'}`}>
+            {i + 1}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-bold text-gray-900 truncate">
+                {user.address.slice(0, 6)}...{user.address.slice(-4)}
+              </span>
+              <span className="text-xs font-black text-yellow-600">{user.reputation}</span>
+            </div>
+            <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
+              <div className="h-full bg-yellow-400 rounded-full transition-all duration-1000" style={{ width: `${(user.reputation / maxRep) * 100}%` }} />
+            </div>
+          </div>
+        </div>
+      ))}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #f9fafb;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #fde047;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #facc15;
+        }
+      `}</style>
     </div>
   );
 }
@@ -391,6 +443,8 @@ const statCards = [
 export default function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [stats, setStats] = useState({ totalEvents: 0, totalTicketsMinted: 0, totalCheckedIn: 0, avgAttendanceRate: 0 });
 
@@ -414,7 +468,19 @@ export default function AdminDashboard() {
     finally { setIsLoading(false); }
   };
 
-  useEffect(() => { fetchEvents(); }, []);
+  const fetchLeaderboard = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/leaderboard`);
+      const data = await res.json();
+      if (data.success) { setLeaderboard(data.leaderboard); }
+    } catch (e) { console.error(e); }
+    finally { setIsLeaderboardLoading(false); }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+    fetchLeaderboard();
+  }, []);
 
   const handleSaved = (updated: Event) => {
     setEvents(prev => prev.map(e => e.id === updated.id ? updated : e));
@@ -469,7 +535,7 @@ export default function AdminDashboard() {
 
         {/* ── CHARTS ROW 1 ────────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2 rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-sm font-black text-gray-900">Tickets Minted by Event</h2>
@@ -486,6 +552,15 @@ export default function AdminDashboard() {
             </div>
             {isLoading ? <div className="flex-1 flex items-center justify-center"><div className="w-8 h-8 rounded-full border-4 border-yellow-400 border-t-transparent animate-spin" /></div>
               : <div className="flex-1 flex items-center"><KycPieChart events={events} /></div>}
+          </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 flex flex-col items-stretch">
+            <div className="mb-5">
+              <h2 className="text-sm font-black text-gray-900">Elite Users</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Highest reputation scores on-chain</p>
+            </div>
+            <div className="flex-1">
+              <ReputationLeaderboard entries={leaderboard} isLoading={isLeaderboardLoading} />
+            </div>
           </div>
         </div>
 
