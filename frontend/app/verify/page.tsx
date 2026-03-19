@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,6 +34,10 @@ const fadeIn = (delay = 0) => ({
 
 export default function VerifyPage() {
   const [input, setInput] = useState('');
+  const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste');
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [results, setResults] = useState<VerificationResult[]>([]);
   const [presentationType, setPresentationType] = useState<'single' | 'bundle' | null>(null);
@@ -92,7 +96,27 @@ export default function VerifyPage() {
     } finally { setIsVerifying(false); }
   };
 
-  const handleClear = () => { setInput(''); setResults([]); setPresentationType(null); };
+  const handleClear = () => { setInput(''); setResults([]); setPresentationType(null); setUploadedFileName(''); };
+
+  const loadFile = (file: File) => {
+    if (!file) return;
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => { setInput((e.target?.result as string) || ''); };
+    reader.readAsText(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) loadFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) loadFile(file);
+  };
 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900">
@@ -117,22 +141,67 @@ export default function VerifyPage() {
           </motion.div>
 
           <motion.div {...fadeUp(0.1)} className="bg-white/70 backdrop-blur-xl rounded-[3rem] p-10 border border-yellow-100 shadow-2xl shadow-yellow-900/5 transition-all duration-300">
+            {/* Mode toggle tabs */}
+            <div className="flex gap-2 mb-6 p-1 bg-yellow-50 rounded-2xl border border-yellow-100">
+              <button
+                onClick={() => setInputMode('paste')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'paste' ? 'bg-white shadow-sm text-yellow-700 border border-yellow-200' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                📋 Paste JSON
+              </button>
+              <button
+                onClick={() => setInputMode('upload')}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${inputMode === 'upload' ? 'bg-white shadow-sm text-yellow-700 border border-yellow-200' : 'text-gray-400 hover:text-gray-600'}`}
+              >
+                📂 Upload .racepass
+              </button>
+            </div>
+
             <div className="mb-8">
-              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Payload Entry</label>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder='{"version": "1.0", ...}'
-                className="w-full h-48 rounded-3xl border-yellow-100 bg-yellow-50/30 p-6 font-mono text-xs focus:ring-yellow-500 focus:border-yellow-500 shadow-inner outline-none transition-all"
-              />
+              {inputMode === 'paste' ? (
+                <>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Payload Entry</label>
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder='{"version": "1.0", ...}'
+                    className="w-full h-48 rounded-3xl border-yellow-100 bg-yellow-50/30 p-6 font-mono text-xs focus:ring-yellow-500 focus:border-yellow-500 shadow-inner outline-none transition-all"
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Upload .racepass File</label>
+                  <input ref={fileInputRef} type="file" accept=".racepass,.json" onChange={handleFileChange} className="hidden" />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={`w-full h-48 rounded-3xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all ${dragOver ? 'border-yellow-400 bg-yellow-50' : uploadedFileName ? 'border-yellow-300 bg-yellow-50/40' : 'border-yellow-100 bg-yellow-50/20 hover:border-yellow-300 hover:bg-yellow-50/40'}`}
+                  >
+                    {uploadedFileName ? (
+                      <>
+                        <div className="text-3xl">✅</div>
+                        <p className="text-sm font-black text-yellow-700">{uploadedFileName}</p>
+                        <p className="text-xs text-gray-400">File loaded — click Verify to audit</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-3xl">📂</div>
+                        <p className="text-sm font-bold text-gray-500">Drop your <span className="text-yellow-600 font-black">.racepass</span> file here</p>
+                        <p className="text-xs text-gray-400">or click to browse</p>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-4">
               <button
                 onClick={handleVerify}
                 disabled={isVerifying || !input.trim()}
-                className={`flex-1 py-4 rounded-full font-black text-xs uppercase tracking-widest transition-all ${isVerifying || !input.trim() ? "bg-gray-100 text-gray-400" : "bg-yellow-400 text-black shadow-xl shadow-yellow-400/20 hover:bg-yellow-300 hover:scale-[1.02]"
-                  }`}
+                className={`flex-1 py-4 rounded-full font-black text-xs uppercase tracking-widest transition-all ${isVerifying || !input.trim() ? "bg-gray-100 text-gray-400" : "bg-yellow-400 text-black shadow-xl shadow-yellow-400/20 hover:bg-yellow-300 hover:scale-[1.02]"}`}
               >
                 {isVerifying ? "Auditing Profile..." : "Start Verification Audit"}
               </button>
@@ -143,6 +212,7 @@ export default function VerifyPage() {
               )}
             </div>
           </motion.div>
+
 
           {/* Results Section */}
           <AnimatePresence>

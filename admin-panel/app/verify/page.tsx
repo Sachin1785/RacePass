@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3005';
@@ -76,8 +76,8 @@ function ResultsPanel({
                 key={i}
                 onClick={() => setActiveIdx(i)}
                 className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all ${activeIdx === i
-                    ? 'bg-yellow-400 text-black'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  ? 'bg-yellow-400 text-black'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
               >
                 {r.success ? (
@@ -187,10 +187,10 @@ function ResultsPanel({
               </div>
             </div>
             <span className={`text-xs font-black px-3 py-1 rounded-full ${results.every(r => r.success)
-                ? 'bg-green-100 text-green-700'
-                : results.some(r => r.success)
-                  ? 'bg-yellow-100 text-yellow-700'
-                  : 'bg-red-100 text-red-700'
+              ? 'bg-green-100 text-green-700'
+              : results.some(r => r.success)
+                ? 'bg-yellow-100 text-yellow-700'
+                : 'bg-red-100 text-red-700'
               }`}>
               {results.every(r => r.success) ? 'All Valid' : results.some(r => r.success) ? 'Partial' : 'All Failed'}
             </span>
@@ -209,6 +209,10 @@ function ResultsPanel({
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function AdminVerifyPage() {
   const [input, setInput] = useState('');
+  const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste');
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [results, setResults] = useState<VerificationResult[]>([]);
   const [presentationType, setPresentationType] = useState<'single' | 'bundle' | null>(null);
@@ -269,6 +273,27 @@ export default function AdminVerifyPage() {
     setResults([]);
     setPresentationType(null);
     setPanelOpen(false);
+    setUploadedFileName('');
+  };
+
+  const loadFile = (file: File) => {
+    if (!file) return;
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => { setInput((e.target?.result as string) || ''); };
+    reader.readAsText(file);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) loadFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) loadFile(file);
   };
 
   return (
@@ -329,7 +354,7 @@ export default function AdminVerifyPage() {
         {/* ── INPUT ───────────────────────────────────────────────────────────── */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 hover:border-yellow-300 transition-colors duration-200">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-black text-gray-900">Paste EAS Certificate JSON</h2>
+            <h2 className="text-base font-black text-gray-900">EAS Certificate Input</h2>
             {panelOpen && results.length > 0 && (
               <button
                 onClick={() => setPanelOpen(true)}
@@ -343,14 +368,57 @@ export default function AdminVerifyPage() {
             )}
           </div>
 
-          <textarea
-            id="credential-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={'{ "version": "1.0", "credentials": [...] }  or paste a single attestation object…'}
-            rows={12}
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 shadow-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 focus:outline-none font-mono text-xs p-4 transition-all duration-200 resize-none"
-          />
+          {/* Mode toggle tabs */}
+          <div className="flex gap-2 mb-5 p-1 bg-gray-50 rounded-xl border border-gray-100">
+            <button
+              onClick={() => setInputMode('paste')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${inputMode === 'paste' ? 'bg-white shadow-sm text-yellow-700 border border-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              📋 Paste JSON
+            </button>
+            <button
+              onClick={() => setInputMode('upload')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all ${inputMode === 'upload' ? 'bg-white shadow-sm text-yellow-700 border border-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              📂 Upload .racepass
+            </button>
+          </div>
+
+          {inputMode === 'paste' ? (
+            <textarea
+              id="credential-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={'{ "version": "1.0", "credentials": [...] }  or paste a single attestation object…'}
+              rows={12}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 shadow-sm focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 focus:outline-none font-mono text-xs p-4 transition-all duration-200 resize-none"
+            />
+          ) : (
+            <>
+              <input ref={fileInputRef} type="file" accept=".racepass,.json" onChange={handleFileChange} className="hidden" />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                className={`w-full rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-3 cursor-pointer transition-all py-16 ${dragOver ? 'border-yellow-400 bg-yellow-50' : uploadedFileName ? 'border-yellow-300 bg-yellow-50/40' : 'border-gray-200 bg-gray-50/50 hover:border-yellow-300 hover:bg-yellow-50/20'}`}
+              >
+                {uploadedFileName ? (
+                  <>
+                    <div className="text-4xl">✅</div>
+                    <p className="text-sm font-bold text-yellow-700">{uploadedFileName}</p>
+                    <p className="text-xs text-gray-400">File loaded — click Verify JSON to audit</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-4xl">📂</div>
+                    <p className="text-sm font-semibold text-gray-500">Drop your <span className="text-yellow-600 font-bold">.racepass</span> file here</p>
+                    <p className="text-xs text-gray-400">or click to browse — accepts .racepass and .json</p>
+                  </>
+                )}
+              </div>
+            </>
+          )}
 
           <div className="mt-4 flex gap-3">
             <button
@@ -358,8 +426,8 @@ export default function AdminVerifyPage() {
               onClick={handleVerify}
               disabled={isVerifying || !input.trim()}
               className={`flex-1 rounded-xl px-6 py-3 text-sm font-bold transition-all duration-200 ${isVerifying || !input.trim()
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-lg shadow-yellow-400/20 hover:-translate-y-0.5'
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-lg shadow-yellow-400/20 hover:-translate-y-0.5'
                 }`}
             >
               {isVerifying ? (

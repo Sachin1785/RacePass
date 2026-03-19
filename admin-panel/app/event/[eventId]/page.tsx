@@ -173,8 +173,8 @@ export default function EventDetailsPage() {
             <div className="space-y-3">
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${event.requiresKyc
-                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                    : 'bg-gray-100 text-gray-600 border border-gray-200'
+                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                  : 'bg-gray-100 text-gray-600 border border-gray-200'
                   }`}
               >
                 {event.requiresKyc ? '✓' : '✗'} KYC {event.requiresKyc ? 'Required' : 'Not Required'}
@@ -280,9 +280,9 @@ export default function EventDetailsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {attendees.map((attendee) => (
+                  {attendees.map((attendee, idx) => (
                     <tr
-                      key={attendee.owner_address}
+                      key={`${attendee.owner_address}-${idx}`}
                       className="hover:bg-yellow-50/40 transition-colors duration-150"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
